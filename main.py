@@ -34,6 +34,21 @@ def parse_args():
         help="Remove duplicate rows from the dataset.",
     )
     clean_parser.add_argument(
+        "--drop-missing",
+        action="store_true",
+        help="Drop rows that contain any missing values.",
+    )
+    clean_parser.add_argument(
+        "--fill-numeric",
+        choices=["mean", "median"],
+        help="Fill missing values in numeric columns using mean or median.",
+    )
+    clean_parser.add_argument(
+        "--fill-categorical",
+        choices=["mode"],
+        help="Fill missing values in non-numeric columns using the mode.",
+    )
+    clean_parser.add_argument(
         "--output",
         required=True,
         metavar="PATH",
@@ -104,10 +119,69 @@ def same_file(path_a, path_b):
     return resolved_a == resolved_b
 
 
-def clean_dataframe(df):
-    cleaned = df.drop_duplicates()
-    removed = len(df) - len(cleaned)
-    return cleaned, removed
+def fill_numeric_missing(df, strategy):
+    cleaned = df.copy()
+    for column in cleaned.columns:
+        if not pd.api.types.is_numeric_dtype(cleaned[column]):
+            continue
+        if strategy == "mean":
+            fill_value = cleaned[column].mean()
+        else:
+            fill_value = cleaned[column].median()
+        if pd.isna(fill_value):
+            print(
+                f"Warning: Column '{column}' has no numeric values to compute a "
+                f"{strategy}. Missing values were left unchanged."
+            )
+            continue
+        cleaned[column] = cleaned[column].fillna(fill_value)
+    return cleaned
+
+
+def fill_categorical_missing(df, strategy):
+    cleaned = df.copy()
+    for column in cleaned.columns:
+        if pd.api.types.is_numeric_dtype(cleaned[column]):
+            continue
+        if strategy == "mode":
+            modes = cleaned[column].mode()
+            if len(modes) == 0:
+                print(
+                    f"Warning: Column '{column}' has no mode. "
+                    "Missing values were left unchanged."
+                )
+                continue
+            fill_value = modes.iloc[0]
+            cleaned[column] = cleaned[column].fillna(fill_value)
+    return cleaned
+
+
+def clean_dataframe(df, remove_duplicates, drop_missing, fill_numeric, fill_categorical):
+    cleaned = df.copy()
+    missing_rows_dropped = 0
+    duplicate_rows_removed = 0
+
+    if drop_missing:
+        before_drop = len(cleaned)
+        cleaned = cleaned.dropna()
+        missing_rows_dropped = before_drop - len(cleaned)
+    else:
+        if fill_numeric:
+            cleaned = fill_numeric_missing(cleaned, fill_numeric)
+        if fill_categorical:
+            cleaned = fill_categorical_missing(cleaned, fill_categorical)
+
+    if remove_duplicates:
+        before_dedupe = len(cleaned)
+        cleaned = cleaned.drop_duplicates()
+        duplicate_rows_removed = before_dedupe - len(cleaned)
+
+    stats = {
+        "missing_rows_dropped": missing_rows_dropped,
+        "duplicate_rows_removed": duplicate_rows_removed,
+        "remaining_missing": int(cleaned.isna().sum().sum()),
+    }
+    return cleaned, stats
 
 
 def save_cleaned_csv(df, output_path):
@@ -128,10 +202,28 @@ def save_cleaned_csv(df, output_path):
         sys.exit(1)
 
 
-def run_clean(csv_path, remove_duplicates, output_path):
-    if not remove_duplicates:
+def run_clean(
+    csv_path,
+    remove_duplicates,
+    drop_missing,
+    fill_numeric,
+    fill_categorical,
+    output_path,
+):
+    has_fill = fill_numeric is not None or fill_categorical is not None
+    has_action = remove_duplicates or drop_missing or has_fill
+
+    if not has_action:
         print("Error: No cleaning action was specified.")
-        print("Use --remove-duplicates to remove duplicate rows.")
+        print(
+            "Use --remove-duplicates, --drop-missing, "
+            "--fill-numeric, or --fill-categorical."
+        )
+        sys.exit(1)
+
+    if drop_missing and has_fill:
+        print("Error: --drop-missing cannot be used with --fill-numeric or --fill-categorical.")
+        print("Choose either dropping missing values or filling them, not both.")
         sys.exit(1)
 
     if same_file(csv_path, output_path):
@@ -140,11 +232,25 @@ def run_clean(csv_path, remove_duplicates, output_path):
 
     df = load_csv(csv_path)
     rows_before = len(df)
-    cleaned, removed = clean_dataframe(df)
+    cleaned, stats = clean_dataframe(
+        df,
+        remove_duplicates,
+        drop_missing,
+        fill_numeric,
+        fill_categorical,
+    )
     save_cleaned_csv(cleaned, output_path)
 
     print(f"Rows before: {rows_before}")
-    print(f"Duplicate rows removed: {removed}")
+    if drop_missing:
+        print(f"Rows dropped for missing values: {stats['missing_rows_dropped']}")
+    if fill_numeric:
+        print(f"Numeric missing values filled with: {fill_numeric}")
+    if fill_categorical:
+        print(f"Categorical missing values filled with: {fill_categorical}")
+    if remove_duplicates:
+        print(f"Duplicate rows removed: {stats['duplicate_rows_removed']}")
+    print(f"Remaining missing values: {stats['remaining_missing']}")
     print(f"Rows after: {len(cleaned)}")
     print(f"Saved cleaned CSV to: {output_path}")
 
@@ -156,7 +262,14 @@ def main():
         df = load_csv(args.csv_path)
         print_report(df, args.csv_path)
     elif args.command == "clean":
-        run_clean(args.csv_path, args.remove_duplicates, args.output)
+        run_clean(
+            args.csv_path,
+            args.remove_duplicates,
+            args.drop_missing,
+            args.fill_numeric,
+            args.fill_categorical,
+            args.output,
+        )
 
 
 if __name__ == "__main__":
