@@ -522,6 +522,7 @@ def profile_dataframe(df):
     if not found_issue:
         print("No text inconsistencies detected.")
     profile_dates(df)
+    profile_units(df)
     print("\nNo data was modified.")
 def detect_date_format(value):
     value = str(value).strip()
@@ -628,6 +629,37 @@ def profile_dates(df):
                     f"  {patient}: "
                     f"discharge date is earlier than admission date"
                 )
+def profile_units(df):
+    unit_pattern = re.compile(
+        r"^\s*[-+]?\d+(?:\.\d+)?\s*(kg|kgs|days?|years?)\s*$",
+        re.IGNORECASE
+    )
+
+    issues = {}
+
+    for column in df.columns:
+        values = df[column].dropna().astype(str).str.strip()
+
+        matches = []
+
+        for value in values:
+            if unit_pattern.match(value):
+                matches.append(value)
+
+        if matches:
+            issues[column] = matches
+
+    if not issues:
+        return
+
+    print("\nEmbedded Units / Text")
+    print("---------------------")
+
+    for column, values in issues.items():
+        print(f"\n{column}:")
+
+        for value in sorted(set(values)):
+            print(f"  {value}")
 def main():
     args = parse_args()
 

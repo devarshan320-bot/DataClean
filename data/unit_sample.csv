@@ -1,0 +1,6 @@
+patient_id,age,weight,stay_duration,marks
+P001,48 years,70kg,8 days,85
+P002,52,60 kg,5days,92
+P003,41 years,55kg,10 days,76
+P004,35,68,7,88
+P005,29 years,NA,6 days,91
