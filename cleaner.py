@@ -1,60 +1,96 @@
 import os
 import re
-import pandas as pd
 import sys
+
+import pandas as pd
+
+
 def fill_numeric_missing(df, strategy):
     cleaned = df.copy()
+
     for column in cleaned.columns:
         if not pd.api.types.is_numeric_dtype(cleaned[column]):
             continue
+
         if strategy == "mean":
             fill_value = cleaned[column].mean()
         else:
             fill_value = cleaned[column].median()
+
         if pd.isna(fill_value):
             print(
                 f"Warning: Column '{column}' has no numeric values to compute a "
                 f"{strategy}. Missing values were left unchanged."
             )
             continue
+
         cleaned[column] = cleaned[column].fillna(fill_value)
+
     return cleaned
 
 
 def fill_categorical_missing(df, strategy):
     cleaned = df.copy()
+
     for column in cleaned.columns:
         if pd.api.types.is_numeric_dtype(cleaned[column]):
             continue
+
         if strategy == "mode":
             modes = cleaned[column].mode()
+
             if len(modes) == 0:
                 print(
                     f"Warning: Column '{column}' has no mode. "
                     "Missing values were left unchanged."
                 )
                 continue
+
             fill_value = modes.iloc[0]
             cleaned[column] = cleaned[column].fillna(fill_value)
+
     return cleaned
 
 
-def clean_dataframe(df, remove_duplicates, drop_missing, fill_numeric, fill_categorical):
+def clean_dataframe(
+    df,
+    remove_duplicates,
+    drop_missing,
+    fill_numeric,
+    fill_categorical,
+):
     cleaned = df.copy()
+
     missing_rows_dropped = 0
     duplicate_rows_removed = 0
+    duplicate_changes = []
 
     if drop_missing:
         before_drop = len(cleaned)
         cleaned = cleaned.dropna()
         missing_rows_dropped = before_drop - len(cleaned)
+
     else:
         if fill_numeric:
             cleaned = fill_numeric_missing(cleaned, fill_numeric)
+
         if fill_categorical:
             cleaned = fill_categorical_missing(cleaned, fill_categorical)
 
     if remove_duplicates:
+        duplicate_mask = cleaned.duplicated()
+
+        for index in cleaned.index[duplicate_mask]:
+            duplicate_changes.append(
+                {
+                    "row": index + 2,
+                    "column": "*",
+                    "original_value": "Duplicate row",
+                    "cleaned_value": "Removed",
+                    "reason": "Removed duplicate row",
+                }
+            )
+
         before_dedupe = len(cleaned)
         cleaned = cleaned.drop_duplicates()
         duplicate_rows_removed = before_dedupe - len(cleaned)
@@ -63,12 +99,15 @@ def clean_dataframe(df, remove_duplicates, drop_missing, fill_numeric, fill_cate
         "missing_rows_dropped": missing_rows_dropped,
         "duplicate_rows_removed": duplicate_rows_removed,
         "remaining_missing": int(cleaned.isna().sum().sum()),
+        "duplicate_changes": duplicate_changes,
     }
+
     return cleaned, stats
 
 
 def save_cleaned_csv(df, output_path):
     parent = os.path.dirname(os.path.abspath(output_path))
+
     if parent and not os.path.isdir(parent):
         print(f"Error: The output folder '{parent}' does not exist.")
         sys.exit(1)
@@ -83,10 +122,12 @@ def save_cleaned_csv(df, output_path):
         print(f"Error: Could not write the cleaned CSV to '{output_path}'.")
         print(f"Details: {exc}")
         sys.exit(1)
+
+
 def remove_units_from_column(df, column, unit="kg"):
     pattern = re.compile(
         r"^\s*([-+]?\d+(?:\.\d+)?)\s*" + re.escape(unit) + r"\s*$",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
 
     changes = []
@@ -109,12 +150,34 @@ def remove_units_from_column(df, column, unit="kg"):
 
             df.at[index, column] = cleaned
 
-            changes.append({
-                "row": index + 2,
-                "column": column,
-                "original_value": original,
-                "cleaned_value": cleaned,
-                "reason": f"Removed {unit} unit"
-            })
+            changes.append(
+                {
+                    "row": index + 2,
+                    "column": column,
+                    "original_value": original,
+                    "cleaned_value": cleaned,
+                    "reason": f"Removed {unit} unit",
+                }
+            )
 
     return changes
+
+
+def print_cleaning_log(changes):
+    if not changes:
+        print("\nCleaning Log")
+        print("------------")
+        print("No changes were made.")
+        return
+
+    print("\nCleaning Log")
+    print("------------")
+
+    for change in changes:
+        print(
+            f"Row {change['row']}: "
+            f"{change['column']} "
+            f"{change['original_value']} -> "
+            f"{change['cleaned_value']} "
+            f"({change['reason']})"
+        )
