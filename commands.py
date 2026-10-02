@@ -4,6 +4,7 @@ from cleaner import (
     clean_dataframe,
     save_cleaned_csv,
     remove_units_from_column,
+    standardize_text_column,
     print_cleaning_log,
 )
 
@@ -42,6 +43,40 @@ def parse_unit_argument(value):
     return column, unit
 
 
+def parse_standardize_text_argument(value):
+    if ":" not in value:
+        print(
+            f"Error: Invalid --standardize-text value '{value}'. "
+            "Expected COLUMN:STYLE, for example gender:title."
+        )
+        sys.exit(1)
+
+    column, style = value.split(":", 1)
+
+    column = column.strip()
+    style = style.strip().lower()
+
+    if not column or not style:
+        print(
+            f"Error: Invalid --standardize-text value '{value}'. "
+            "Expected COLUMN:STYLE, for example gender:title."
+        )
+        sys.exit(1)
+
+    allowed_styles = {"strip", "lower", "upper", "title"}
+
+    if style not in allowed_styles:
+        print(
+            f"Error: Unsupported text standardization style '{style}'."
+        )
+        print(
+            "Supported styles: strip, lower, upper, title."
+        )
+        sys.exit(1)
+
+    return column, style
+
+
 def run_clean(
     csv_path,
     remove_duplicates,
@@ -49,6 +84,7 @@ def run_clean(
     fill_numeric,
     fill_categorical,
     remove_units,
+    standardize_text,
     output_path,
     preview,
 ):
@@ -59,13 +95,15 @@ def run_clean(
         or drop_missing
         or has_fill
         or remove_units
+        or standardize_text
     )
 
     if not has_action:
         print("Error: No cleaning action was specified.")
         print(
             "Use --remove-duplicates, --drop-missing, "
-            "--fill-numeric, --fill-categorical, or --remove-units."
+            "--fill-numeric, --fill-categorical, "
+            "--remove-units, or --standardize-text."
         )
         sys.exit(1)
 
@@ -119,6 +157,23 @@ def run_clean(
 
         changes.extend(unit_changes)
 
+    if standardize_text:
+        text_column, text_style = parse_standardize_text_argument(
+            standardize_text
+        )
+
+        if text_column not in cleaned.columns:
+            print(f"Error: Column '{text_column}' does not exist.")
+            sys.exit(1)
+
+        text_changes = standardize_text_column(
+            cleaned,
+            text_column,
+            text_style,
+        )
+
+        changes.extend(text_changes)
+
     if preview:
         print("\nCleaning Preview")
         print("----------------")
@@ -160,30 +215,48 @@ def run_clean(
             f"{stats['duplicate_rows_removed']}"
         )
 
+    if remove_units:
+        print(f"Unit removal applied: {remove_units}")
+
+    if standardize_text:
+        print(
+            f"Text standardization applied: "
+            f"{standardize_text}"
+        )
+
     print(
         f"Remaining missing values: "
         f"{stats['remaining_missing']}"
     )
 
     print(f"Rows after: {len(cleaned)}")
-
     print(f"Saved cleaned CSV to: {output_path}")
 
     if changes:
         print_cleaning_log(changes)
 
 
-def run_validate(csv_path, args):
+def run_validate(
+    csv_path,
+    min_rules,
+    max_rules,
+    not_null_rules,
+    allowed_values_rules,
+):
     df = load_csv(csv_path)
 
-    rules = build_rules(args, df)
-    results = validate_dataframe(df, rules)
-
-    print_validation_report(
-        df,
-        csv_path,
-        results,
+    rules = build_rules(
+        min_rules,
+        max_rules,
+        not_null_rules,
+        allowed_values_rules,
     )
 
-    if any(result["indexes"] for result in results):
-        sys.exit(1)
+    passed = validate_dataframe(df, rules)
+
+    print_validation_report(passed)
+
+    if passed:
+        sys.exit(0)
+
+    sys.exit(1)

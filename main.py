@@ -84,6 +84,14 @@ def parse_args():
     help="Remove a specified unit from a column. Format: COLUMN:UNIT, e.g. weight:kg",
     )
     clean_parser.add_argument(
+    "--standardize-text",
+    help=(
+        "Standardize text in a column. "
+        "Format: COLUMN:STYLE, "
+        "where STYLE is strip, lower, upper, or title."
+    ),
+  )
+    clean_parser.add_argument(
     "--preview",
     action="store_true",
     help="Preview cleaning changes without creating an output file.",
@@ -149,6 +157,7 @@ def main():
             args.fill_numeric,
             args.fill_categorical,
             args.remove_units,
+            args.standardize_text,
             args.output,
             args.preview,
         )

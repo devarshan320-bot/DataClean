@@ -92,12 +92,12 @@ def clean_dataframe(
 
     missing_rows_dropped = 0
     duplicate_rows_removed = 0
+
     duplicate_changes = []
     missing_changes = []
 
     if drop_missing:
         before_drop = len(cleaned)
-
         missing_mask = cleaned.isna().any(axis=1)
 
         for index in cleaned.index[missing_mask]:
@@ -179,7 +179,9 @@ def save_cleaned_csv(df, output_path):
 
 def remove_units_from_column(df, column, unit="kg"):
     pattern = re.compile(
-        r"^\s*([-+]?\d+(?:\.\d+)?)\s*" + re.escape(unit) + r"\s*$",
+        r"^\s*([-+]?\d+(?:\.\d+)?)\s*"
+        + re.escape(unit)
+        + r"\s*$",
         re.IGNORECASE,
     )
 
@@ -209,6 +211,64 @@ def remove_units_from_column(df, column, unit="kg"):
                     "original_value": original,
                     "cleaned_value": cleaned,
                     "reason": f"Removed {unit} unit",
+                }
+            )
+
+    return changes
+
+
+def standardize_text_column(df, column, style):
+    if not (
+        pd.api.types.is_object_dtype(df[column])
+        or pd.api.types.is_string_dtype(df[column])
+    ):
+        print(
+            f"Error: Column '{column}' is not a text column. "
+            "Text standardization can only be applied to text columns."
+        )
+        sys.exit(1)
+
+    changes = []
+
+    for index, value in df[column].items():
+        if pd.isna(value):
+            continue
+
+        original = str(value)
+
+        if style == "strip":
+            cleaned = original.strip()
+            reason = "Standardized text by removing leading/trailing whitespace"
+
+        elif style == "lower":
+            cleaned = original.strip().lower()
+            reason = "Standardized text using lowercase"
+
+        elif style == "upper":
+            cleaned = original.strip().upper()
+            reason = "Standardized text using uppercase"
+
+        elif style == "title":
+            cleaned = original.strip().title()
+            reason = "Standardized text using title case"
+
+        else:
+            print(
+                f"Error: Unsupported text standardization style '{style}'."
+            )
+            print("Supported styles: strip, lower, upper, title.")
+            sys.exit(1)
+
+        if original != cleaned:
+            df.at[index, column] = cleaned
+
+            changes.append(
+                {
+                    "row": index + 2,
+                    "column": column,
+                    "original_value": original,
+                    "cleaned_value": cleaned,
+                    "reason": reason,
                 }
             )
 
