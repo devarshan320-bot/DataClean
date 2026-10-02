@@ -54,6 +54,10 @@ def parse_args():
         metavar="PATH",
         help="Path for the new cleaned CSV file. The original file is not changed.",
     )
+    clean_parser.add_argument(
+    "--remove-units",
+    help="Remove kg units from the specified column"
+    )
     profile_parser = subparsers.add_parser(
     "profile",
     help="Profile a CSV file for potential data-quality issues"
@@ -252,16 +256,17 @@ def run_clean(
     drop_missing,
     fill_numeric,
     fill_categorical,
+    remove_units,
     output_path,
 ):
     has_fill = fill_numeric is not None or fill_categorical is not None
-    has_action = remove_duplicates or drop_missing or has_fill
+    has_action = remove_duplicates or drop_missing or has_fill or remove_units
 
     if not has_action:
         print("Error: No cleaning action was specified.")
         print(
             "Use --remove-duplicates, --drop-missing, "
-            "--fill-numeric, or --fill-categorical."
+            "--fill-numeric, --fill-categorical, or --remove-units."
         )
         sys.exit(1)
 
@@ -283,6 +288,18 @@ def run_clean(
         fill_numeric,
         fill_categorical,
     )
+    unit_changes = []
+
+    if remove_units:
+        if remove_units not in cleaned.columns:
+            print(f"Error: Column '{remove_units}' does not exist.")
+            sys.exit(1)
+
+        unit_changes = remove_units_from_column(
+            cleaned,
+            remove_units,
+            "kg"
+        )    
     save_cleaned_csv(cleaned, output_path)
 
     print(f"Rows before: {rows_before}")
@@ -297,7 +314,18 @@ def run_clean(
     print(f"Remaining missing values: {stats['remaining_missing']}")
     print(f"Rows after: {len(cleaned)}")
     print(f"Saved cleaned CSV to: {output_path}")
+    if unit_changes:
+        print("\nCleaning Log")
+        print("------------")
 
+        for change in unit_changes:
+            print(
+                f"Row {change['row']}: "
+                f"{change['column']} "
+                f"{change['original_value']} -> "
+                f"{change['cleaned_value']} "
+                f"({change['reason']})"
+            )
 def parse_column_value(value):
     if "=" not in value:
         print(f"Error: Invalid rule '{value}'. Expected COLUMN=VALUE.")
@@ -660,6 +688,41 @@ def profile_units(df):
 
         for value in sorted(set(values)):
             print(f"  {value}")
+def remove_units_from_column(df, column, unit="kg"):
+    pattern = re.compile(
+        r"^\s*([-+]?\d+(?:\.\d+)?)\s*" + re.escape(unit) + r"\s*$",
+        re.IGNORECASE
+    )
+
+    changes = []
+
+    # Work with object dtype so numeric values can be inserted.
+    df[column] = df[column].astype(object)
+
+    for index, value in df[column].items():
+        if pd.isna(value):
+            continue
+
+        original = str(value).strip()
+        match = pattern.match(original)
+
+        if match:
+            cleaned = float(match.group(1))
+
+            if cleaned.is_integer():
+                cleaned = int(cleaned)
+
+            df.at[index, column] = cleaned
+
+            changes.append({
+                "row": index + 2,
+                "column": column,
+                "original_value": original,
+                "cleaned_value": cleaned,
+                "reason": f"Removed {unit} unit"
+            })
+
+    return changes
 def main():
     args = parse_args()
 
@@ -673,8 +736,10 @@ def main():
             args.drop_missing,
             args.fill_numeric,
             args.fill_categorical,
+            args.remove_units,
             args.output,
         )
+        
     elif args.command == "profile":
         try:
             df = pd.read_csv(args.input_file)

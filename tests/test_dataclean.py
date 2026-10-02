@@ -1,7 +1,12 @@
 import unittest
 
 import pandas as pd
-from main import clean_dataframe, same_file, validate_dataframe
+from main import (
+    clean_dataframe,
+    same_file,
+    validate_dataframe,
+    remove_units_from_column,
+)
 
 class TestDataClean(unittest.TestCase):
 
@@ -92,6 +97,17 @@ class TestDataClean(unittest.TestCase):
         results = validate_dataframe(df, rules)
 
         self.assertEqual(results[0]["indexes"], [2])
+    def test_remove_units_from_column(self):
+        df = pd.DataFrame({
+            "weight": ["70kg", "60 kg", "55kg", "68", None]
+            })
+        changes = remove_units_from_column(df, "weight", "kg")
+        self.assertEqual(df.loc[0, "weight"], 70)
+        self.assertEqual(df.loc[1, "weight"], 60)
+        self.assertEqual(df.loc[2, "weight"], 55)
+        self.assertEqual(df.loc[3, "weight"], "68")
+        self.assertTrue(pd.isna(df.loc[4, "weight"]))
+        self.assertEqual(len(changes), 3)          
 
 if __name__ == "__main__":
     unittest.main()
