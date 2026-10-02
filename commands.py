@@ -19,6 +19,29 @@ from validator import (
 )
 
 
+def parse_unit_argument(value):
+    if ":" not in value:
+        print(
+            f"Error: Invalid --remove-units value '{value}'. "
+            "Expected COLUMN:UNIT, for example weight:kg."
+        )
+        sys.exit(1)
+
+    column, unit = value.split(":", 1)
+
+    column = column.strip()
+    unit = unit.strip()
+
+    if not column or not unit:
+        print(
+            f"Error: Invalid --remove-units value '{value}'. "
+            "Expected COLUMN:UNIT, for example weight:kg."
+        )
+        sys.exit(1)
+
+    return column, unit
+
+
 def run_clean(
     csv_path,
     remove_duplicates,
@@ -30,6 +53,7 @@ def run_clean(
     preview,
 ):
     has_fill = fill_numeric is not None or fill_categorical is not None
+
     has_action = (
         remove_duplicates
         or drop_missing
@@ -75,17 +99,22 @@ def run_clean(
         fill_categorical,
     )
 
-    changes = stats["duplicate_changes"]
+    changes = []
+
+    changes.extend(stats["missing_changes"])
+    changes.extend(stats["duplicate_changes"])
 
     if remove_units:
-        if remove_units not in cleaned.columns:
-            print(f"Error: Column '{remove_units}' does not exist.")
+        remove_column, remove_unit = parse_unit_argument(remove_units)
+
+        if remove_column not in cleaned.columns:
+            print(f"Error: Column '{remove_column}' does not exist.")
             sys.exit(1)
 
         unit_changes = remove_units_from_column(
             cleaned,
-            remove_units,
-            "kg",
+            remove_column,
+            remove_unit,
         )
 
         changes.extend(unit_changes)

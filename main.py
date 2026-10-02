@@ -81,7 +81,7 @@ def parse_args():
     )
     clean_parser.add_argument(
     "--remove-units",
-    help="Remove kg units from the specified column"
+    help="Remove a specified unit from a column. Format: COLUMN:UNIT, e.g. weight:kg",
     )
     clean_parser.add_argument(
     "--preview",

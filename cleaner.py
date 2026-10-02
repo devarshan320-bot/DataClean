@@ -7,6 +7,7 @@ import pandas as pd
 
 def fill_numeric_missing(df, strategy):
     cleaned = df.copy()
+    changes = []
 
     for column in cleaned.columns:
         if not pd.api.types.is_numeric_dtype(cleaned[column]):
@@ -24,13 +25,27 @@ def fill_numeric_missing(df, strategy):
             )
             continue
 
+        missing_indexes = cleaned.index[cleaned[column].isna()]
+
+        for index in missing_indexes:
+            changes.append(
+                {
+                    "row": index + 2,
+                    "column": column,
+                    "original_value": "NaN",
+                    "cleaned_value": fill_value,
+                    "reason": f"Filled missing value using {strategy}",
+                }
+            )
+
         cleaned[column] = cleaned[column].fillna(fill_value)
 
-    return cleaned
+    return cleaned, changes
 
 
 def fill_categorical_missing(df, strategy):
     cleaned = df.copy()
+    changes = []
 
     for column in cleaned.columns:
         if pd.api.types.is_numeric_dtype(cleaned[column]):
@@ -47,9 +62,23 @@ def fill_categorical_missing(df, strategy):
                 continue
 
             fill_value = modes.iloc[0]
+
+            missing_indexes = cleaned.index[cleaned[column].isna()]
+
+            for index in missing_indexes:
+                changes.append(
+                    {
+                        "row": index + 2,
+                        "column": column,
+                        "original_value": "NaN",
+                        "cleaned_value": fill_value,
+                        "reason": "Filled missing value using mode",
+                    }
+                )
+
             cleaned[column] = cleaned[column].fillna(fill_value)
 
-    return cleaned
+    return cleaned, changes
 
 
 def clean_dataframe(
@@ -64,18 +93,41 @@ def clean_dataframe(
     missing_rows_dropped = 0
     duplicate_rows_removed = 0
     duplicate_changes = []
+    missing_changes = []
 
     if drop_missing:
         before_drop = len(cleaned)
+
+        missing_mask = cleaned.isna().any(axis=1)
+
+        for index in cleaned.index[missing_mask]:
+            missing_changes.append(
+                {
+                    "row": index + 2,
+                    "column": "*",
+                    "original_value": "Row contains missing value",
+                    "cleaned_value": "Removed",
+                    "reason": "Dropped row containing missing value",
+                }
+            )
+
         cleaned = cleaned.dropna()
         missing_rows_dropped = before_drop - len(cleaned)
 
     else:
         if fill_numeric:
-            cleaned = fill_numeric_missing(cleaned, fill_numeric)
+            cleaned, numeric_changes = fill_numeric_missing(
+                cleaned,
+                fill_numeric,
+            )
+            missing_changes.extend(numeric_changes)
 
         if fill_categorical:
-            cleaned = fill_categorical_missing(cleaned, fill_categorical)
+            cleaned, categorical_changes = fill_categorical_missing(
+                cleaned,
+                fill_categorical,
+            )
+            missing_changes.extend(categorical_changes)
 
     if remove_duplicates:
         duplicate_mask = cleaned.duplicated()
@@ -100,6 +152,7 @@ def clean_dataframe(
         "duplicate_rows_removed": duplicate_rows_removed,
         "remaining_missing": int(cleaned.isna().sum().sum()),
         "duplicate_changes": duplicate_changes,
+        "missing_changes": missing_changes,
     }
 
     return cleaned, stats
@@ -132,7 +185,6 @@ def remove_units_from_column(df, column, unit="kg"):
 
     changes = []
 
-    # Work with object dtype so numeric values can be inserted.
     df[column] = df[column].astype(object)
 
     for index, value in df[column].items():
