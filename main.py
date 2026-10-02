@@ -54,7 +54,14 @@ def parse_args():
         metavar="PATH",
         help="Path for the new cleaned CSV file. The original file is not changed.",
     )
-
+    profile_parser = subparsers.add_parser(
+    "profile",
+    help="Profile a CSV file for potential data-quality issues"
+    )
+    profile_parser.add_argument(
+    "input_file",
+    help="Path to the CSV file"
+)
     validate_parser = subparsers.add_parser(
         "validate",
         help="Check a CSV file against user-specified rules without changing it.",
@@ -485,6 +492,37 @@ def run_validate(csv_path, args):
 
     if any(result["indexes"] for result in results):
         sys.exit(1)
+def profile_dataframe(df):
+    print("\nText Inconsistencies")
+    print("--------------------")
+
+    found_issue = False
+
+    for column in df.select_dtypes(include=["object", "string"]).columns:
+        values = df[column].dropna().astype(str)
+
+        normalized = {}
+        for value in values:
+            key = value.strip().lower()
+            normalized.setdefault(key, set()).add(value)
+
+        inconsistencies = {
+            key: variants
+            for key, variants in normalized.items()
+            if len(variants) > 1
+        }
+
+        if inconsistencies:
+            found_issue = True
+            print(f"\n{column}:")
+
+            for variants in inconsistencies.values():
+                print("  " + ", ".join(sorted(variants)))
+
+    if not found_issue:
+        print("No text inconsistencies detected.")
+
+    print("\nNo data was modified.")
 def main():
     args = parse_args()
 
@@ -500,6 +538,20 @@ def main():
             args.fill_categorical,
             args.output,
         )
+    elif args.command == "profile":
+        try:
+            df = pd.read_csv(args.input_file)
+        except FileNotFoundError:
+            print(f"Error: File not found: {args.input_file}")
+            return
+        except Exception as e:
+            print(f"Error reading file: {e}")
+            return
+
+        print(f"\nDATA PROFILE: {os.path.basename(args.input_file)}")
+        print(f"Rows: {len(df)}")
+        print(f"Columns: {len(df.columns)}")
+        profile_dataframe(df)    
     elif args.command == "validate":
         run_validate(args.csv_path, args)
 
