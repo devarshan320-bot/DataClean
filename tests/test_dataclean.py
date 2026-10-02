@@ -1,12 +1,12 @@
 import unittest
-
 import pandas as pd
+
 from main import (
     clean_dataframe,
-    same_file,
     validate_dataframe,
     remove_units_from_column,
 )
+from utils import same_file
 
 class TestDataClean(unittest.TestCase):
 
