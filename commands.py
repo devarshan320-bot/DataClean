@@ -26,7 +26,8 @@ def run_clean(
     fill_categorical,
     remove_units,
     output_path,
-    ):
+    preview,
+):
     has_fill = fill_numeric is not None or fill_categorical is not None
     has_action = remove_duplicates or drop_missing or has_fill or remove_units
 
@@ -68,6 +69,26 @@ def run_clean(
             remove_units,
             "kg"
         )    
+
+    if preview:
+        print("\nCleaning Preview")
+        print("----------------")
+        if unit_changes:
+            print("\nChanges that would be made:")
+            for change in unit_changes:
+                print(
+                    f"Row {change['row']}: "
+                    f"{change['column']} "
+                    f"{change['original_value']} -> "
+                    f"{change['cleaned_value']} "
+                    f"({change['reason']})"
+                )
+                print(f"\nValues changed: {len(unit_changes)}")
+        else:
+            print("\nNo changes detected.")
+
+        print("\nNo file was modified.")
+        return    
     save_cleaned_csv(cleaned, output_path)
 
     print(f"Rows before: {rows_before}")

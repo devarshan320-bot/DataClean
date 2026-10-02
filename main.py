@@ -83,6 +83,11 @@ def parse_args():
     "--remove-units",
     help="Remove kg units from the specified column"
     )
+    clean_parser.add_argument(
+    "--preview",
+    action="store_true",
+    help="Preview cleaning changes without creating an output file.",
+   )
     profile_parser = subparsers.add_parser(
     "profile",
     help="Profile a CSV file for potential data-quality issues"
@@ -145,6 +150,7 @@ def main():
             args.fill_categorical,
             args.remove_units,
             args.output,
+            args.preview,
         )
         
     elif args.command == "profile":
