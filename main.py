@@ -26,7 +26,9 @@ from profiler import (
 )
 
 from commands import (
+    run_ai_instruction,
     run_clean,
+    run_local_ai_instruction,
     run_validate,
     run_instruction,
 )
@@ -161,7 +163,50 @@ def parse_args():
         action="store_true",
         help="Preview the changes without creating an output file.",
     )
+    ai_parser = subparsers.add_parser(
+        "ai",
+        help="Clean a CSV using a natural-language AI instruction",
+    )
 
+    ai_parser.add_argument(
+        "csv_path",
+    )
+
+    ai_parser.add_argument(
+        "instruction",
+    )
+
+    ai_parser.add_argument(
+        "--output",
+        required=True,
+    )
+
+    ai_parser.add_argument(
+        "--preview",
+        action="store_true",
+    )
+    local_ai_parser = subparsers.add_parser(
+        "local-ai",
+        help="Clean a CSV using local AI",
+    )
+
+    local_ai_parser.add_argument(
+        "csv_path",
+    )
+
+    local_ai_parser.add_argument(
+        "instruction",
+    )
+
+    local_ai_parser.add_argument(
+        "--output",
+        required=True,
+    )
+
+    local_ai_parser.add_argument(
+        "--preview",
+        action="store_true",
+    )
     return parser.parse_args()
 
 
@@ -204,6 +249,20 @@ def main():
         )
     elif args.command == "instruction":
         run_instruction(
+            args.csv_path,
+            args.instruction,
+            args.output,
+            args.preview,
+        )
+    elif args.command == "ai":
+        run_ai_instruction(
+            args.csv_path,
+            args.instruction,
+            args.output,
+            args.preview,
+        )
+    elif args.command == "local-ai":
+        run_local_ai_instruction(
             args.csv_path,
             args.instruction,
             args.output,

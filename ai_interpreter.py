@@ -93,17 +93,20 @@ User instruction:
 {instruction}
 """
 
-    response = client.models.generate_content(
-        model="gemini-3.8-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=OperationRequest,
-            automatic_function_calling=types.AutomaticFunctionCallingConfig(
-                disable=True
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.8-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=OperationRequest,
+                automatic_function_calling=(
+                    types.AutomaticFunctionCallingConfig(disable=True)
+                ),
             ),
-        ),
-    )
+        )
+    except Exception as error:
+        raise RuntimeError(f"Gemini request failed: {error}") from error
 
     if response.parsed is None:
         raise ValueError("AI did not return a valid structured operation.")

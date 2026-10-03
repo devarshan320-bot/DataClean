@@ -320,3 +320,143 @@ def run_validate(csv_path, args):
         sys.exit(0)
 
     sys.exit(1)
+
+
+def run_ai_instruction(csv_path, instruction, output_path, preview):
+    from ai_interpreter import interpret_instruction
+    from operation_executor import execute_operation
+    from operations import validate_operation_request
+
+    df = load_csv(csv_path)
+
+    print(f"Instruction: {instruction}")
+
+    request = interpret_instruction(instruction)
+
+    operation = request["operation"]
+    column = request.get("column")
+    parameters = request.get("parameters", {})
+
+    print(f"Operation: {operation}")
+
+    valid, message = validate_operation_request(
+        operation,
+        column,
+        parameters,
+    )
+
+    if not valid:
+        print(f"Error: AI generated an invalid operation: {message}")
+        sys.exit(1)
+
+    print("Operation validated successfully.")
+
+    cleaned, changes = execute_operation(
+        df,
+        request,
+    )
+
+    if preview:
+        print("\nCleaning Preview")
+        print("----------------")
+
+        if changes:
+            print_cleaning_log(changes)
+        else:
+            print("No changes would be made.")
+
+        print("\nNo file was modified.")
+        return
+
+    if same_file(csv_path, output_path):
+        print(
+            "Error: --output must be a new file. "
+            "The original CSV will not be overwritten."
+        )
+        sys.exit(1)
+
+    save_cleaned_csv(
+        cleaned,
+        output_path,
+    )
+
+    print(f"\nRows before: {len(df)}")
+    print(f"Rows after: {len(cleaned)}")
+    print(f"Saved cleaned CSV to: {output_path}")
+
+    print_cleaning_log(changes)
+
+
+def run_local_ai_instruction(
+    csv_path,
+    instruction,
+    output_path,
+    preview,
+):
+    from local_ai_interpreter import interpret_instruction
+    from operation_executor import execute_operation
+    from operations import validate_operation_request
+
+    df = load_csv(csv_path)
+
+    print(f"Instruction: {instruction}")
+
+    request = interpret_instruction(instruction)
+
+    operation = request["operation"]
+    column = request.get("column")
+    parameters = request.get("parameters", {})
+
+    print(f"Operation: {operation}")
+
+    valid, message = validate_operation_request(
+        operation,
+        column,
+        parameters,
+    )
+
+    if not valid:
+        print(f"Error: Local AI generated an invalid operation: {message}")
+        sys.exit(1)
+
+    if column is not None and column not in df.columns:
+        print(f"Error: Column '{column}' was not found in the dataset.")
+        print(f"Available columns: {', '.join(df.columns)}")
+        sys.exit(1)
+
+    print("Operation validated successfully.")
+
+    cleaned, changes = execute_operation(
+        df,
+        request,
+    )
+
+    if preview:
+        print("\nCleaning Preview")
+        print("----------------")
+
+        if changes:
+            print_cleaning_log(changes)
+        else:
+            print("No changes would be made.")
+
+        print("\nNo file was modified.")
+        return
+
+    if same_file(csv_path, output_path):
+        print(
+            "Error: --output must be a new file. "
+            "The original CSV will not be overwritten."
+        )
+        sys.exit(1)
+
+    save_cleaned_csv(
+        cleaned,
+        output_path,
+    )
+
+    print(f"\nRows before: {len(df)}")
+    print(f"Rows after: {len(cleaned)}")
+    print(f"Saved cleaned CSV to: {output_path}")
+
+    print_cleaning_log(changes)
