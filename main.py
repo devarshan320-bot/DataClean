@@ -30,6 +30,7 @@ from commands import (
     run_validate,
 )
 
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="DataClean — inspect, clean, or validate a CSV file."
@@ -80,30 +81,26 @@ def parse_args():
         help="Path for the new cleaned CSV file. The original file is not changed.",
     )
     clean_parser.add_argument(
-    "--remove-units",
-    help="Remove a specified unit from a column. Format: COLUMN:UNIT, e.g. weight:kg",
+        "--remove-units",
+        help="Remove a specified unit from a column. Format: COLUMN:UNIT, e.g. weight:kg",
     )
     clean_parser.add_argument(
-    "--standardize-text",
-    help=(
-        "Standardize text in a column. "
-        "Format: COLUMN:STYLE, "
-        "where STYLE is strip, lower, upper, or title."
-    ),
-  )
+        "--standardize-text",
+        help=(
+            "Standardize text in a column. "
+            "Format: COLUMN:STYLE, "
+            "where STYLE is strip, lower, upper, or title."
+        ),
+    )
     clean_parser.add_argument(
-    "--preview",
-    action="store_true",
-    help="Preview cleaning changes without creating an output file.",
-   )
+        "--preview",
+        action="store_true",
+        help="Preview cleaning changes without creating an output file.",
+    )
     profile_parser = subparsers.add_parser(
-    "profile",
-    help="Profile a CSV file for potential data-quality issues"
+        "profile", help="Profile a CSV file for potential data-quality issues"
     )
-    profile_parser.add_argument(
-    "input_file",
-    help="Path to the CSV file"
-  )
+    profile_parser.add_argument("input_file", help="Path to the CSV file")
     validate_parser = subparsers.add_parser(
         "validate",
         help="Check a CSV file against user-specified rules without changing it.",
@@ -143,6 +140,7 @@ def parse_args():
 
     return parser.parse_args()
 
+
 def main():
     args = parse_args()
 
@@ -161,7 +159,7 @@ def main():
             args.output,
             args.preview,
         )
-        
+
     elif args.command == "profile":
         try:
             df = pd.read_csv(args.input_file)
@@ -172,12 +170,9 @@ def main():
             print(f"Error reading file: {e}")
             return
 
-        print(f"\nDATA PROFILE: {os.path.basename(args.input_file)}")
-        print(f"Rows: {len(df)}")
-        print(f"Columns: {len(df.columns)}")
-        profile_dataframe(df)    
-    elif args.command == "validate":
-        run_validate(args.csv_path, args)
+        print(f"\nDataset: {os.path.basename(args.input_file)}")
+        profile_dataframe(df)
+
 
 if __name__ == "__main__":
     main()
