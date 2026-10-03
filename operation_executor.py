@@ -7,6 +7,14 @@ from cleaner import (
 from operations import validate_operation_request
 
 
+from cleaner import (
+    clean_dataframe,
+    remove_units_from_column,
+    standardize_text_column,
+)
+from operations import validate_operation_request
+
+
 def execute_operation(df, request):
     operation = request["operation"]
     column = request.get("column")
@@ -21,9 +29,14 @@ def execute_operation(df, request):
     if not valid:
         raise ValueError(message)
 
+    if column is not None and column not in df.columns:
+        raise ValueError(
+            f"Column '{column}' was not found in the dataset. "
+            f"Available columns: {', '.join(df.columns)}"
+        )
+
     if operation == "remove_duplicates":
         cleaned = df.drop_duplicates().copy()
-
         changes = []
 
         duplicate_mask = df.duplicated()
