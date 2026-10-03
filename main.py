@@ -207,6 +207,22 @@ def parse_args():
         "--preview",
         action="store_true",
     )
+    analyze_parser = subparsers.add_parser(
+        "analyze",
+        help="Analyze dataset quality",
+    )
+
+    analyze_parser.add_argument(
+        "csv_path",
+    )
+    suggest_parser = subparsers.add_parser(
+        "suggest",
+        help="Suggest controlled cleaning operations",
+    )
+
+    suggest_parser.add_argument(
+        "csv_path",
+    )
     return parser.parse_args()
 
 
@@ -268,6 +284,14 @@ def main():
             args.output,
             args.preview,
         )
+    elif args.command == "analyze":
+        from commands import run_analyze
+
+        run_analyze(args.csv_path)
+    elif args.command == "suggest":
+        from commands import run_suggest
+
+        run_suggest(args.csv_path)
 
 
 if __name__ == "__main__":

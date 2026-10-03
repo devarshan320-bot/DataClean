@@ -87,12 +87,13 @@ def clean_dataframe(
     drop_missing,
     fill_numeric,
     fill_categorical,
+    numeric_column=None,
 ):
     cleaned = df.copy()
 
     missing_rows_dropped = 0
     duplicate_rows_removed = 0
-
+    changes = []
     duplicate_changes = []
     missing_changes = []
 
@@ -116,12 +117,31 @@ def clean_dataframe(
 
     else:
         if fill_numeric:
-            cleaned, numeric_changes = fill_numeric_missing(
-                cleaned,
-                fill_numeric,
-            )
-            missing_changes.extend(numeric_changes)
+            if numeric_column is None:
+                cleaned, numeric_changes = fill_numeric_missing(
+                    cleaned,
+                    fill_numeric,
+                )
+                missing_changes.extend(numeric_changes)
+            else:
+                if numeric_column not in cleaned.columns:
+                    raise ValueError(
+                        f"Column '{numeric_column}' was not found in the dataset."
+                    )
 
+                if not pd.api.types.is_numeric_dtype(cleaned[numeric_column]):
+                    raise ValueError(f"Column '{numeric_column}' is not numeric.")
+
+                column_df = cleaned[[numeric_column]].copy()
+
+                column_df, numeric_changes = fill_numeric_missing(
+                    column_df,
+                    fill_numeric,
+                )
+
+                cleaned[numeric_column] = column_df[numeric_column]
+
+                missing_changes.extend(numeric_changes)
         if fill_categorical:
             cleaned, categorical_changes = fill_categorical_missing(
                 cleaned,
@@ -179,9 +199,7 @@ def save_cleaned_csv(df, output_path):
 
 def remove_units_from_column(df, column, unit="kg"):
     pattern = re.compile(
-        r"^\s*([-+]?\d+(?:\.\d+)?)\s*"
-        + re.escape(unit)
-        + r"\s*$",
+        r"^\s*([-+]?\d+(?:\.\d+)?)\s*" + re.escape(unit) + r"\s*$",
         re.IGNORECASE,
     )
 
@@ -253,9 +271,7 @@ def standardize_text_column(df, column, style):
             reason = "Standardized text using title case"
 
         else:
-            print(
-                f"Error: Unsupported text standardization style '{style}'."
-            )
+            print(f"Error: Unsupported text standardization style '{style}'.")
             print("Supported styles: strip, lower, upper, title.")
             sys.exit(1)
 

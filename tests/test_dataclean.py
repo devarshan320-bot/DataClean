@@ -13,6 +13,7 @@ from commands import run_clean
 from validator import validate_dataframe
 from operation_executor import execute_operation
 from instruction_parser import parse_instruction
+from quality_analyzer import analyze_quality
 from instruction_normalizer import normalize_instruction
 from operations import (
     get_operation,
@@ -647,6 +648,126 @@ class TestDataClean(unittest.TestCase):
     def test_normalize_instruction_empty(self):
         with self.assertRaises(ValueError):
             normalize_instruction("   ")
+
+    def test_quality_analyzer_detects_missing_values(self):
+        df = pd.DataFrame(
+            {
+                "name": ["Rahul", "Arjun", "Sneha"],
+                "age": [20, None, 21],
+                "marks": [85, 90, None],
+            }
+        )
+
+        issues = analyze_quality(df)
+
+        missing_issues = [
+            issue for issue in issues if issue["type"] == "missing_values"
+        ]
+
+        self.assertEqual(len(missing_issues), 2)
+
+        self.assertIn(
+            {
+                "type": "missing_values",
+                "column": "age",
+                "count": 1,
+            },
+            missing_issues,
+        )
+
+        self.assertIn(
+            {
+                "type": "missing_values",
+                "column": "marks",
+                "count": 1,
+            },
+            missing_issues,
+        )
+
+    def test_quality_analyzer_detects_duplicate_rows(self):
+        df = pd.DataFrame(
+            {
+                "name": ["Rahul", "Arjun", "Rahul"],
+                "age": [20, 21, 20],
+            }
+        )
+
+        issues = analyze_quality(df)
+
+        duplicate_issues = [
+            issue for issue in issues if issue["type"] == "duplicate_rows"
+        ]
+
+        self.assertEqual(
+            duplicate_issues,
+            [
+                {
+                    "type": "duplicate_rows",
+                    "count": 1,
+                }
+            ],
+        )
+
+    def test_quality_analyzer_detects_text_inconsistency(self):
+        df = pd.DataFrame(
+            {
+                "city": [
+                    "Bengaluru",
+                    "bengaluru",
+                    " Bengaluru ",
+                ]
+            }
+        )
+
+        issues = analyze_quality(df)
+
+        text_issues = [
+            issue for issue in issues if issue["type"] == "text_inconsistency"
+        ]
+
+        self.assertEqual(len(text_issues), 1)
+        self.assertEqual(text_issues[0]["column"], "city")
+
+        self.assertEqual(
+            text_issues[0]["variants"],
+            [" Bengaluru ", "Bengaluru", "bengaluru"],
+        )
+
+    def test_quality_analyzer_detects_embedded_units(self):
+        df = pd.DataFrame(
+            {
+                "weight": [
+                    "10kg",
+                    "20kg",
+                    "30kg",
+                ]
+            }
+        )
+
+        issues = analyze_quality(df)
+
+        unit_issues = [issue for issue in issues if issue["type"] == "embedded_units"]
+
+        self.assertEqual(len(unit_issues), 1)
+        self.assertEqual(unit_issues[0]["column"], "weight")
+
+        self.assertEqual(
+            unit_issues[0]["values"],
+            ["10kg", "20kg", "30kg"],
+        )
+
+    def test_quality_analyzer_returns_no_issues_for_clean_data(self):
+        df = pd.DataFrame(
+            {
+                "name": ["Rahul", "Arjun", "Sneha"],
+                "age": [20, 21, 22],
+                "marks": [85, 90, 95],
+            }
+        )
+
+        issues = analyze_quality(df)
+
+        self.assertEqual(issues, [])
 
 
 if __name__ == "__main__":

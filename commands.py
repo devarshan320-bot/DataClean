@@ -460,3 +460,210 @@ def run_local_ai_instruction(
     print(f"Saved cleaned CSV to: {output_path}")
 
     print_cleaning_log(changes)
+
+
+def run_analyze(csv_path):
+    from quality_analyzer import analyze_quality
+
+    df = load_csv(csv_path)
+
+    issues = analyze_quality(df)
+
+    print(f"Dataset: {csv_path}")
+
+    print("\nDATA QUALITY ANALYSIS")
+    print("=====================")
+
+    if not issues:
+        print("\nNo quality issues detected.")
+        return
+
+    print(f"\nIssues detected: {len(issues)}")
+
+    for issue in issues:
+        issue_type = issue["type"]
+        column = issue.get("column")
+
+        if issue_type == "missing_values":
+            print(f"\nMissing values in '{column}': " f"{issue['count']}")
+
+        elif issue_type == "duplicate_rows":
+            print(f"\nDuplicate rows: " f"{issue['count']}")
+
+        elif issue_type == "text_inconsistency":
+            print(f"\nText inconsistency in '{column}':")
+            print("  Variants: " + ", ".join(issue["variants"]))
+
+        elif issue_type == "date_format_inconsistency":
+            print(f"\nDate-format inconsistency in '{column}':")
+            print("  Formats: " + ", ".join(issue["formats"]))
+
+        elif issue_type == "embedded_units":
+            print(f"\nEmbedded units in '{column}':")
+            print("  Values: " + ", ".join(issue["values"]))
+
+    print("\nNo data was modified.")
+
+
+def run_suggest(csv_path):
+    from quality_analyzer import analyze_quality
+    from local_ai_interpreter import suggest_operation
+
+    df = load_csv(csv_path)
+
+    issues = analyze_quality(df)
+
+    print(f"Dataset: {csv_path}")
+
+    print("\nAI QUALITY SUGGESTIONS")
+    print("=====================")
+
+    if not issues:
+        print("\nNo quality issues detected.")
+        return
+
+    for issue in issues:
+        print("\nDetected issue:")
+        print(issue)
+
+        try:
+            suggestion = suggest_operation(issue)
+
+        except (RuntimeError, ValueError) as error:
+            print(f"AI suggestion failed: {error}")
+            continue
+
+        if suggestion["operation"] is None:
+            print("Suggestion: No safe operation identified.")
+            continue
+
+        print("\nSuggested operation:")
+        print(f"  Operation: {suggestion['operation']}")
+
+        if suggestion.get("column") is not None:
+            print(f"  Column: {suggestion['column']}")
+
+        parameters = suggestion.get("parameters", {})
+
+        if parameters:
+            print(f"  Parameters: {parameters}")
+
+    print("\nNo data was modified.")
+
+
+def prepare_suggestion(issue):
+    from local_ai_interpreter import suggest_operation
+    from operations import validate_operation_request
+
+    suggestion = suggest_operation(issue)
+
+    if suggestion.get("operation") is None:
+        raise ValueError("No safe operation was suggested for this issue.")
+
+    operation = suggestion["operation"]
+    column = suggestion.get("column")
+    parameters = suggestion.get("parameters", {})
+
+    valid, message = validate_operation_request(
+        operation,
+        column,
+        parameters,
+    )
+
+    if not valid:
+        raise ValueError(f"Invalid AI suggestion: {message}")
+
+    return {
+        "issue": issue,
+        "operation": operation,
+        "column": column,
+        "parameters": parameters,
+    }
+
+
+def preview_suggestion(csv_path, issue):
+    from operation_executor import execute_operation
+
+    df = load_csv(csv_path)
+
+    suggestion = prepare_suggestion(issue)
+
+    request = {
+        "operation": suggestion["operation"],
+        "column": suggestion["column"],
+        "parameters": suggestion["parameters"],
+    }
+
+    cleaned, changes = execute_operation(
+        df,
+        request,
+    )
+
+    print("\nAI Suggestion")
+    print("-------------")
+    print(f"Operation: {suggestion['operation']}")
+
+    if suggestion["column"] is not None:
+        print(f"Column: {suggestion['column']}")
+
+    if suggestion["parameters"]:
+        print(f"Parameters: {suggestion['parameters']}")
+
+    print("\nCleaning Preview")
+    print("----------------")
+
+    if changes:
+        print_cleaning_log(changes)
+    else:
+        print("No changes would be made.")
+
+    print("\nNo file was modified.")
+
+    return cleaned, changes
+
+
+def apply_suggestion(csv_path, issue, output_path):
+    from operation_executor import execute_operation
+
+    df = load_csv(csv_path)
+
+    suggestion = prepare_suggestion(issue)
+
+    request = {
+        "operation": suggestion["operation"],
+        "column": suggestion["column"],
+        "parameters": suggestion["parameters"],
+    }
+
+    cleaned, changes = execute_operation(
+        df,
+        request,
+    )
+
+    if same_file(csv_path, output_path):
+        print(
+            "Error: --output must be a new file. "
+            "The original CSV will not be overwritten."
+        )
+        sys.exit(1)
+
+    save_cleaned_csv(
+        cleaned,
+        output_path,
+    )
+
+    print("\nSuggestion approved.")
+    print(f"Operation: {suggestion['operation']}")
+
+    if suggestion["column"] is not None:
+        print(f"Column: {suggestion['column']}")
+
+    if suggestion["parameters"]:
+        print(f"Parameters: {suggestion['parameters']}")
+
+    print(f"\nRows before: {len(df)}")
+    print(f"Rows after: {len(cleaned)}")
+
+    print(f"\nSaved cleaned CSV to: {output_path}")
+
+    print_cleaning_log(changes)

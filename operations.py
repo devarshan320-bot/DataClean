@@ -10,11 +10,13 @@ OPERATIONS = {
         "implemented": True,
     },
     "fill_numeric": {
-        "description": "Fill missing values in numeric columns.",
         "requires_column": False,
-        "parameters": ["strategy"],
-        "allowed_values": {
-            "strategy": ["mean", "median"],
+        "optional_column": True,
+        "parameters": {
+            "strategy": {
+                "required": True,
+                "allowed": ["mean", "median"],
+            },
         },
         "implemented": True,
     },
@@ -143,9 +145,12 @@ def validate_operation_request(
     if definition["requires_column"] and not column:
         return False, (f"Operation '{operation}' requires a column.")
 
-    if not definition["requires_column"] and column:
+    if (
+        not definition["requires_column"]
+        and column
+        and not definition.get("optional_column", False)
+    ):
         return False, (f"Operation '{operation}' does not use a column.")
-
     valid, message = validate_operation(
         operation,
         parameters,

@@ -83,6 +83,7 @@ def execute_operation(df, request):
             False,
             parameters["strategy"],
             None,
+            column,
         )
 
         return cleaned, stats["missing_changes"]

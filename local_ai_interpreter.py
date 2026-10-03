@@ -2,6 +2,7 @@ import json
 import subprocess
 
 OLLAMA_PATH = r"C:\Users\Devarshan\AppData\Local\Programs\Ollama\ollama.exe"
+
 MODEL_NAME = "qwen2.5:3b"
 
 
@@ -15,13 +16,17 @@ ALLOWED_OPERATIONS = {
 }
 
 
-def interpret_instruction(instruction):
-    prompt = f"""
-You are a DataClean instruction interpreter.
+def suggest_operation(issue):
+    issue_text = json.dumps(issue)
 
-Convert the user's instruction into JSON.
+    prompt = f"""
+You are the suggestion engine for DataClean.
+
+Your job is to convert ONE detected data-quality issue
+into ONE controlled DataClean operation.
 
 Allowed operations:
+
 remove_duplicates
 drop_missing
 fill_numeric
@@ -30,89 +35,36 @@ remove_units
 standardize_text
 
 Return ONLY valid JSON.
-Do not explain.
-Do not write Python.
-Do not add markdown.
 
-Use exactly these JSON structures:
+The JSON must have exactly this structure:
 
-For remove_duplicates:
 {{
-    "operation": "remove_duplicates",
+    "operation": "...",
     "column": null,
     "parameters": {{}}
 }}
-
-For drop_missing:
-{{
-    "operation": "drop_missing",
-    "column": null,
-    "parameters": {{}}
-}}
-
-For fill_numeric:
-{{
-    "operation": "fill_numeric",
-    "column": null,
-    "parameters": {{
-        "strategy": "mean"
-    }}
-}}
-
-or:
-
-{{
-    "operation": "fill_numeric",
-    "column": null,
-    "parameters": {{
-        "strategy": "median"
-    }}
-}}
-
-For fill_categorical:
-{{
-    "operation": "fill_categorical",
-    "column": null,
-    "parameters": {{
-        "strategy": "mode"
-    }}
-}}
-
-For remove_units:
-{{
-    "operation": "remove_units",
-    "column": "COLUMN_NAME",
-    "parameters": {{
-        "unit": "UNIT"
-    }}
-}}
-
-For standardize_text:
-{{
-    "operation": "standardize_text",
-    "column": "COLUMN_NAME",
-    "parameters": {{
-        "style": "strip"
-    }}
-}}
-
-Allowed standardize_text styles:
-strip
-lower
-upper
-title
 
 Rules:
-- Do not invent an operation.
-- Do not invent a column.
-- Do not invent a unit.
-- Do not invent a strategy.
-- Do not invent a style.
-- If a required parameter is not present, use null.
-- Return JSON only.
 
-User instruction:
-{instruction}
+1. Never invent an operation.
+2. Do not modify any data.
+3. Do not return explanations.
+4. For duplicate_rows, use remove_duplicates.
+5. For missing numeric values, use fill_numeric.
+6. For fill_numeric, ALWAYS include:
+"strategy": "median"
+7. For missing categorical/text values, use fill_categorical.
+8. For embedded units, use remove_units only when the unit is clearly identifiable.
+9. For text inconsistencies, use standardize_text only when the required style is clear.
+10. If a safe operation cannot be determined, return:
+    {{
+        "operation": null,
+        "column": null,
+        "parameters": {{}},
+    }}
+Detected issue:
+
+{issue_text}
 """
 
     result = subprocess.run(
@@ -130,18 +82,18 @@ User instruction:
     )
 
     if result.returncode != 0:
-        raise RuntimeError(f"Ollama failed: {result.stderr.strip()}")
+        raise RuntimeError(f"Local AI request failed: {result.stderr.strip()}")
 
     output = result.stdout.strip()
 
     try:
         request = json.loads(output)
     except json.JSONDecodeError as error:
-        raise ValueError(f"Local AI did not return valid JSON: {output}") from error
+        raise ValueError("Local AI did not return valid JSON.") from error
 
     operation = request.get("operation")
 
-    if operation not in ALLOWED_OPERATIONS:
-        raise ValueError(f"Local AI returned an invalid operation: {operation}")
+    if operation is not None and operation not in ALLOWED_OPERATIONS:
+        raise ValueError(f"Local AI returned unsupported operation: {operation}")
 
     return request
