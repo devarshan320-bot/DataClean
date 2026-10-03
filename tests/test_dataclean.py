@@ -11,12 +11,15 @@ from cleaner import (
 from utils import same_file
 from commands import run_clean
 from validator import validate_dataframe
+from operation_executor import execute_operation
+from instruction_parser import parse_instruction
 from operations import (
     get_operation,
     is_implemented_operation,
     is_supported_operation,
     list_operations,
     validate_operation,
+    create_operation_request,
 )
 
 
@@ -404,6 +407,225 @@ class TestDataClean(unittest.TestCase):
             "not implemented yet",
             message,
         )
+
+    def test_create_operation_request(self):
+        request = create_operation_request(
+            "standardize_text",
+            column="gender",
+            parameters={"style": "title"},
+        )
+
+        self.assertEqual(
+            request,
+            {
+                "operation": "standardize_text",
+                "column": "gender",
+                "parameters": {"style": "title"},
+            },
+        )
+
+    def test_create_operation_request_requires_column(self):
+        with self.assertRaises(ValueError):
+            create_operation_request(
+                "standardize_text",
+                parameters={"style": "title"},
+            )
+
+    def test_create_operation_request_rejects_invalid_parameters(self):
+        with self.assertRaises(ValueError):
+            create_operation_request(
+                "standardize_text",
+                column="gender",
+                parameters={"style": "random"},
+            )
+
+    def test_parse_remove_duplicates_instruction(self):
+        request = parse_instruction("Remove duplicates")
+
+        self.assertEqual(
+            request,
+            {
+                "operation": "remove_duplicates",
+                "column": None,
+                "parameters": {},
+            },
+        )
+
+    def test_parse_remove_duplicate_instruction(self):
+        request = parse_instruction("Remove duplicate")
+
+        self.assertEqual(
+            request,
+            {
+                "operation": "remove_duplicates",
+                "column": None,
+                "parameters": {},
+            },
+        )
+
+    def test_parse_remove_units_instruction(self):
+        request = parse_instruction("Remove kg from the weight column")
+
+        self.assertEqual(
+            request,
+            {
+                "operation": "remove_units",
+                "column": "weight",
+                "parameters": {
+                    "unit": "kg",
+                },
+            },
+        )
+
+    def test_parse_unknown_instruction(self):
+        with self.assertRaises(ValueError):
+            parse_instruction("Do something random")
+
+    def test_parse_fill_numeric_median_instruction(self):
+        request = parse_instruction("Fill missing numeric values using median")
+
+        self.assertEqual(
+            request,
+            {
+                "operation": "fill_numeric",
+                "column": None,
+                "parameters": {
+                    "strategy": "median",
+                },
+            },
+        )
+
+    def test_parse_fill_numeric_mean_instruction(self):
+        request = parse_instruction("Fill missing numeric values using mean")
+
+        self.assertEqual(
+            request,
+            {
+                "operation": "fill_numeric",
+                "column": None,
+                "parameters": {
+                    "strategy": "mean",
+                },
+            },
+        )
+
+    def test_parse_invalid_fill_numeric_strategy(self):
+        with self.assertRaises(ValueError):
+            parse_instruction("Fill missing numeric values using mode")
+
+    def test_execute_remove_duplicates(self):
+        df = pd.DataFrame(
+            {
+                "name": ["A", "B", "B"],
+                "age": [20, 21, 21],
+            }
+        )
+
+        request = {
+            "operation": "remove_duplicates",
+            "column": None,
+            "parameters": {},
+        }
+
+        cleaned, changes = execute_operation(
+            df,
+            request,
+        )
+
+        self.assertEqual(len(cleaned), 2)
+        self.assertEqual(len(changes), 1)
+
+    def test_execute_remove_units(self):
+        df = pd.DataFrame(
+            {
+                "weight": ["10kg", "20kg", "30kg"],
+            }
+        )
+
+        request = {
+            "operation": "remove_units",
+            "column": "weight",
+            "parameters": {
+                "unit": "kg",
+            },
+        }
+
+        cleaned, changes = execute_operation(
+            df,
+            request,
+        )
+
+        self.assertEqual(
+            cleaned["weight"].tolist(),
+            [10, 20, 30],
+        )
+        self.assertEqual(len(changes), 3)
+
+    def test_execute_fill_numeric(self):
+        df = pd.DataFrame(
+            {
+                "age": [20, 30, None],
+            }
+        )
+
+        request = {
+            "operation": "fill_numeric",
+            "column": None,
+            "parameters": {
+                "strategy": "mean",
+            },
+        }
+
+        cleaned, changes = execute_operation(
+            df,
+            request,
+        )
+
+        self.assertEqual(
+            cleaned["age"].tolist(),
+            [20, 30, 25],
+        )
+        self.assertEqual(len(changes), 1)
+
+    def test_execute_operation_requires_column(self):
+        df = pd.DataFrame(
+            {
+                "weight": ["10kg", "20kg"],
+            }
+        )
+
+        request = {
+            "operation": "remove_units",
+            "column": None,
+            "parameters": {
+                "unit": "kg",
+            },
+        }
+
+        with self.assertRaises(ValueError):
+            execute_operation(
+                df,
+                request,
+            )
+
+    def test_execute_operation_rejects_unneeded_column(self):
+        df = pd.DataFrame(
+            {
+                "name": ["A", "B"],
+            }
+        )
+
+        request = {
+            "operation": "remove_duplicates",
+            "column": "name",
+            "parameters": {},
+        }
+
+        with self.assertRaises(ValueError):
+            execute_operation(
+                df,
+                request,
+            )
 
 
 if __name__ == "__main__":

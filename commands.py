@@ -243,6 +243,58 @@ def run_clean(
         print_cleaning_log(changes)
 
 
+def run_instruction(
+    csv_path,
+    instruction,
+    output_path,
+    preview,
+):
+    from instruction_parser import parse_instruction
+    from operation_executor import execute_operation
+
+    df = load_csv(csv_path)
+
+    request = parse_instruction(instruction)
+
+    print(f"Instruction: {instruction}")
+    print(f"Operation: {request['operation']}")
+
+    cleaned, changes = execute_operation(
+        df,
+        request,
+    )
+
+    if preview:
+        print("\nCleaning Preview")
+        print("----------------")
+
+        if changes:
+            print_cleaning_log(changes)
+        else:
+            print("No changes would be made.")
+
+        print("\nNo file was modified.")
+        return
+
+    if same_file(csv_path, output_path):
+        print(
+            "Error: --output must be a new file. "
+            "The original CSV will not be overwritten."
+        )
+        sys.exit(1)
+
+    save_cleaned_csv(
+        cleaned,
+        output_path,
+    )
+
+    print(f"\nRows before: {len(df)}")
+    print(f"Rows after: {len(cleaned)}")
+    print(f"Saved cleaned CSV to: {output_path}")
+
+    print_cleaning_log(changes)
+
+
 def run_validate(csv_path, args):
     df = load_csv(csv_path)
 

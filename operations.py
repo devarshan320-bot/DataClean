@@ -102,3 +102,56 @@ def validate_operation(operation, parameters=None):
                 )
 
     return True, "Operation is valid."
+
+
+def create_operation_request(
+    operation,
+    column=None,
+    parameters=None,
+):
+    valid, message = validate_operation_request(
+        operation,
+        column,
+        parameters,
+    )
+
+    if not valid:
+        raise ValueError(message)
+
+    return {
+        "operation": operation,
+        "column": column,
+        "parameters": parameters or {},
+    }
+
+
+def validate_operation_request(
+    operation,
+    column=None,
+    parameters=None,
+):
+    if not is_supported_operation(operation):
+        return False, f"Unsupported operation: {operation}"
+
+    definition = OPERATIONS[operation]
+
+    if not definition["implemented"]:
+        return False, (
+            f"Operation '{operation}' is supported but " "not implemented yet."
+        )
+
+    if definition["requires_column"] and not column:
+        return False, (f"Operation '{operation}' requires a column.")
+
+    if not definition["requires_column"] and column:
+        return False, (f"Operation '{operation}' does not use a column.")
+
+    valid, message = validate_operation(
+        operation,
+        parameters,
+    )
+
+    if not valid:
+        return False, message
+
+    return True, "Operation request is valid."

@@ -28,6 +28,7 @@ from profiler import (
 from commands import (
     run_clean,
     run_validate,
+    run_instruction,
 )
 
 
@@ -137,6 +138,29 @@ def parse_args():
         metavar="COLUMN=a,b,c",
         help="Flag non-missing values in COLUMN that are not in the comma-separated list.",
     )
+    instruction_parser = subparsers.add_parser(
+        "instruction",
+        help="Execute a supported natural-language cleaning instruction.",
+    )
+    instruction_parser.add_argument(
+        "csv_path",
+        help="Path to the CSV file to clean.",
+    )
+    instruction_parser.add_argument(
+        "instruction",
+        help="Natural-language cleaning instruction.",
+    )
+    instruction_parser.add_argument(
+        "--output",
+        required=True,
+        metavar="PATH",
+        help="Path for the new cleaned CSV file.",
+    )
+    instruction_parser.add_argument(
+        "--preview",
+        action="store_true",
+        help="Preview the changes without creating an output file.",
+    )
 
     return parser.parse_args()
 
@@ -177,6 +201,13 @@ def main():
         run_validate(
             args.csv_path,
             args,
+        )
+    elif args.command == "instruction":
+        run_instruction(
+            args.csv_path,
+            args.instruction,
+            args.output,
+            args.preview,
         )
 
 
