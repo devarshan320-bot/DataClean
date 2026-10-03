@@ -173,6 +173,12 @@ def main():
         print(f"\nDataset: {os.path.basename(args.input_file)}")
         profile_dataframe(df)
 
+    elif args.command == "validate":
+        run_validate(
+            args.csv_path,
+            args,
+        )
+
 
 if __name__ == "__main__":
     main()

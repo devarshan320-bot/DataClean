@@ -11,6 +11,13 @@ from cleaner import (
 from utils import same_file
 from commands import run_clean
 from validator import validate_dataframe
+from operations import (
+    get_operation,
+    is_implemented_operation,
+    is_supported_operation,
+    list_operations,
+    validate_operation,
+)
 
 
 class TestDataClean(unittest.TestCase):
@@ -323,6 +330,80 @@ class TestDataClean(unittest.TestCase):
         finally:
             if os.path.exists(output_path):
                 os.remove(output_path)
+
+    def test_supported_operation(self):
+        self.assertTrue(is_supported_operation("standardize_text"))
+
+    def test_unsupported_operation(self):
+        self.assertFalse(is_supported_operation("unknown_operation"))
+
+    def test_get_operation(self):
+        operation = get_operation("remove_units")
+
+        self.assertIsNotNone(operation)
+        self.assertTrue(operation["requires_column"])
+        self.assertIn("unit", operation["parameters"])
+
+    def test_list_operations(self):
+        operations = list_operations()
+
+        self.assertIn("remove_duplicates", operations)
+        self.assertIn("standardize_text", operations)
+        self.assertIn("date_format", operations)
+        self.assertIn("currency_format", operations)
+
+    def test_implemented_operation(self):
+        self.assertTrue(is_implemented_operation("standardize_text"))
+
+        self.assertFalse(is_implemented_operation("date_format"))
+
+    def test_valid_operation_parameters(self):
+        valid, message = validate_operation(
+            "standardize_text",
+            {"style": "title"},
+        )
+
+        self.assertTrue(valid)
+        self.assertEqual(
+            message,
+            "Operation is valid.",
+        )
+
+    def test_invalid_operation_parameters(self):
+        valid, message = validate_operation(
+            "standardize_text",
+            {"style": "random"},
+        )
+
+        self.assertFalse(valid)
+        self.assertIn(
+            "Invalid value",
+            message,
+        )
+
+    def test_missing_operation_parameter(self):
+        valid, message = validate_operation(
+            "standardize_text",
+            {},
+        )
+
+        self.assertFalse(valid)
+        self.assertIn(
+            "Missing required parameter",
+            message,
+        )
+
+    def test_unimplemented_operation(self):
+        valid, message = validate_operation(
+            "date_format",
+            {"format": "MM-DD-YYYY"},
+        )
+
+        self.assertFalse(valid)
+        self.assertIn(
+            "not implemented yet",
+            message,
+        )
 
 
 if __name__ == "__main__":

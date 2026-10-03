@@ -8,6 +8,8 @@ from cleaner import (
     print_cleaning_log,
 )
 
+from operations import validate_operation
+
 from utils import (
     load_csv,
     same_file,
@@ -63,18 +65,18 @@ def parse_standardize_text_argument(value):
         )
         sys.exit(1)
 
-    allowed_styles = {"strip", "lower", "upper", "title"}
-
-    if style not in allowed_styles:
-        print(
-            f"Error: Unsupported text standardization style '{style}'."
-        )
-        print(
-            "Supported styles: strip, lower, upper, title."
-        )
-        sys.exit(1)
-
     return column, style
+
+
+def validate_registered_operation(operation, parameters=None):
+    valid, message = validate_operation(
+        operation,
+        parameters,
+    )
+
+    if not valid:
+        print(f"Error: {message}")
+        sys.exit(1)
 
 
 def run_clean(
@@ -112,11 +114,26 @@ def run_clean(
             "Error: --drop-missing cannot be used with "
             "--fill-numeric or --fill-categorical."
         )
-        print(
-            "Choose either dropping missing values or filling them, "
-            "not both."
-        )
+        print("Choose either dropping missing values or filling them, " "not both.")
         sys.exit(1)
+
+    if remove_duplicates:
+        validate_registered_operation("remove_duplicates")
+
+    if drop_missing:
+        validate_registered_operation("drop_missing")
+
+    if fill_numeric:
+        validate_registered_operation(
+            "fill_numeric",
+            {"strategy": fill_numeric},
+        )
+
+    if fill_categorical:
+        validate_registered_operation(
+            "fill_categorical",
+            {"strategy": fill_categorical},
+        )
 
     if not preview and same_file(csv_path, output_path):
         print(
@@ -145,6 +162,11 @@ def run_clean(
     if remove_units:
         remove_column, remove_unit = parse_unit_argument(remove_units)
 
+        validate_registered_operation(
+            "remove_units",
+            {"unit": remove_unit},
+        )
+
         if remove_column not in cleaned.columns:
             print(f"Error: Column '{remove_column}' does not exist.")
             sys.exit(1)
@@ -158,8 +180,11 @@ def run_clean(
         changes.extend(unit_changes)
 
     if standardize_text:
-        text_column, text_style = parse_standardize_text_argument(
-            standardize_text
+        text_column, text_style = parse_standardize_text_argument(standardize_text)
+
+        validate_registered_operation(
+            "standardize_text",
+            {"style": text_style},
         )
 
         if text_column not in cleaned.columns:
@@ -192,42 +217,24 @@ def run_clean(
     print(f"Rows before: {rows_before}")
 
     if drop_missing:
-        print(
-            f"Rows dropped for missing values: "
-            f"{stats['missing_rows_dropped']}"
-        )
+        print(f"Rows dropped for missing values: " f"{stats['missing_rows_dropped']}")
 
     if fill_numeric:
-        print(
-            f"Numeric missing values filled with: "
-            f"{fill_numeric}"
-        )
+        print(f"Numeric missing values filled with: " f"{fill_numeric}")
 
     if fill_categorical:
-        print(
-            f"Categorical missing values filled with: "
-            f"{fill_categorical}"
-        )
+        print(f"Categorical missing values filled with: " f"{fill_categorical}")
 
     if remove_duplicates:
-        print(
-            f"Duplicate rows removed: "
-            f"{stats['duplicate_rows_removed']}"
-        )
+        print(f"Duplicate rows removed: " f"{stats['duplicate_rows_removed']}")
 
     if remove_units:
-        print(f"Unit removal applied: {remove_units}")
+        print(f"Unit removal applied: " f"{remove_units}")
 
     if standardize_text:
-        print(
-            f"Text standardization applied: "
-            f"{standardize_text}"
-        )
+        print(f"Text standardization applied: " f"{standardize_text}")
 
-    print(
-        f"Remaining missing values: "
-        f"{stats['remaining_missing']}"
-    )
+    print(f"Remaining missing values: " f"{stats['remaining_missing']}")
 
     print(f"Rows after: {len(cleaned)}")
     print(f"Saved cleaned CSV to: {output_path}")
@@ -236,27 +243,28 @@ def run_clean(
         print_cleaning_log(changes)
 
 
-def run_validate(
-    csv_path,
-    min_rules,
-    max_rules,
-    not_null_rules,
-    allowed_values_rules,
-):
+def run_validate(csv_path, args):
     df = load_csv(csv_path)
 
     rules = build_rules(
-        min_rules,
-        max_rules,
-        not_null_rules,
-        allowed_values_rules,
+        args,
+        df,
     )
 
-    passed = validate_dataframe(df, rules)
+    results = validate_dataframe(
+        df,
+        rules,
+    )
 
-    print_validation_report(passed)
+    print_validation_report(
+        df,
+        csv_path,
+        results,
+    )
 
-    if passed:
+    total_violations = sum(len(result["indexes"]) for result in results)
+
+    if total_violations == 0:
         sys.exit(0)
 
     sys.exit(1)
