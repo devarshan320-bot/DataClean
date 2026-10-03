@@ -1,13 +1,11 @@
 import re
 
+from instruction_normalizer import normalize_instruction
 from operations import create_operation_request
 
 
 def parse_instruction(instruction):
-    text = instruction.strip()
-
-    if not text:
-        raise ValueError("Instruction cannot be empty.")
+    text = normalize_instruction(instruction)
 
     if re.fullmatch(
         r"remove\s+duplicates?",

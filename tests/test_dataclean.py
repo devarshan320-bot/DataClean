@@ -13,6 +13,7 @@ from commands import run_clean
 from validator import validate_dataframe
 from operation_executor import execute_operation
 from instruction_parser import parse_instruction
+from instruction_normalizer import normalize_instruction
 from operations import (
     get_operation,
     is_implemented_operation,
@@ -626,6 +627,26 @@ class TestDataClean(unittest.TestCase):
                 df,
                 request,
             )
+
+    def test_normalize_instruction_whitespace(self):
+        result = normalize_instruction("  Remove    duplicates  ")
+
+        self.assertEqual(
+            result,
+            "Remove duplicates",
+        )
+
+    def test_normalize_instruction_synonyms(self):
+        result = normalize_instruction("Replace empty numbers")
+
+        self.assertEqual(
+            result,
+            "fill missing numeric values",
+        )
+
+    def test_normalize_instruction_empty(self):
+        with self.assertRaises(ValueError):
+            normalize_instruction("   ")
 
 
 if __name__ == "__main__":
