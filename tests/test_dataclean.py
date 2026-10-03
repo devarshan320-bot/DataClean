@@ -1,14 +1,16 @@
+import os
 import unittest
-
+import tempfile
 import pandas as pd
 
-from main import (
+from cleaner import (
     clean_dataframe,
-    validate_dataframe,
     remove_units_from_column,
+    standardize_text_column,
 )
-
 from utils import same_file
+from commands import run_clean
+from validator import validate_dataframe
 
 
 class TestDataClean(unittest.TestCase):
@@ -39,7 +41,6 @@ class TestDataClean(unittest.TestCase):
         self.assertEqual(change["original_value"], "Duplicate row")
         self.assertEqual(change["cleaned_value"], "Removed")
 
-
     def test_drop_missing(self):
         df = pd.DataFrame(
             {
@@ -67,7 +68,6 @@ class TestDataClean(unittest.TestCase):
                 change["reason"],
                 "Dropped row containing missing value",
             )
-
 
     def test_fill_numeric_missing_audit(self):
         df = pd.DataFrame(
@@ -104,7 +104,6 @@ class TestDataClean(unittest.TestCase):
         self.assertEqual(changes[1]["original_value"], "NaN")
         self.assertEqual(changes[1]["cleaned_value"], 80.0)
 
-
     def test_fill_categorical_missing_audit(self):
         df = pd.DataFrame(
             {
@@ -133,7 +132,6 @@ class TestDataClean(unittest.TestCase):
             "Filled missing value using mode",
         )
 
-
     def test_same_file(self):
         self.assertTrue(
             same_file(
@@ -148,7 +146,6 @@ class TestDataClean(unittest.TestCase):
                 "data/other.csv",
             )
         )
-
 
     def test_validation_min(self):
         df = pd.DataFrame(
@@ -166,7 +163,6 @@ class TestDataClean(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["indexes"], [0])
 
-
     def test_validation_not_null(self):
         df = pd.DataFrame(
             {
@@ -182,7 +178,6 @@ class TestDataClean(unittest.TestCase):
 
         self.assertEqual(results[0]["indexes"], [1])
 
-
     def test_validation_max(self):
         df = pd.DataFrame(
             {
@@ -197,7 +192,6 @@ class TestDataClean(unittest.TestCase):
         results = validate_dataframe(df, rules)
 
         self.assertEqual(results[0]["indexes"], [2])
-
 
     def test_validation_allowed_values(self):
         df = pd.DataFrame(
@@ -217,7 +211,6 @@ class TestDataClean(unittest.TestCase):
         results = validate_dataframe(df, rules)
 
         self.assertEqual(results[0]["indexes"], [2])
-
 
     def test_remove_units_from_column(self):
         df = pd.DataFrame(
@@ -251,6 +244,85 @@ class TestDataClean(unittest.TestCase):
             changes[0]["reason"],
             "Removed kg unit",
         )
+
+    def test_standardize_text_title(self):
+        df = pd.DataFrame(
+            {
+                "gender": ["male", "FEMALE", " Male ", "Female"],
+            }
+        )
+
+        changes = standardize_text_column(
+            df,
+            "gender",
+            "title",
+        )
+
+        self.assertEqual(
+            df["gender"].tolist(),
+            ["Male", "Female", "Male", "Female"],
+        )
+
+        self.assertEqual(len(changes), 3)
+
+    def test_standardize_text_strip(self):
+        df = pd.DataFrame(
+            {
+                "city": [" Bengaluru ", "Mysuru", " Bengaluru"],
+            }
+        )
+
+        changes = standardize_text_column(
+            df,
+            "city",
+            "strip",
+        )
+
+        self.assertEqual(
+            df["city"].tolist(),
+            ["Bengaluru", "Mysuru", "Bengaluru"],
+        )
+
+        self.assertEqual(len(changes), 2)
+
+    def test_run_clean_rejects_overwriting_input(self):
+        with self.assertRaises(SystemExit):
+            run_clean(
+                "data/sample.csv",
+                False,
+                False,
+                None,
+                None,
+                None,
+                None,
+                "data/sample.csv",
+                False,
+            )
+
+    def test_run_clean_preview_does_not_create_output(self):
+        output_path = "data/test_preview_output.csv"
+
+        if os.path.exists(output_path):
+            os.remove(output_path)
+
+        try:
+            run_clean(
+                "data/sample.csv",
+                False,
+                False,
+                "median",
+                None,
+                None,
+                None,
+                output_path,
+                True,
+            )
+
+            self.assertFalse(os.path.exists(output_path))
+
+        finally:
+            if os.path.exists(output_path):
+                os.remove(output_path)
 
 
 if __name__ == "__main__":
