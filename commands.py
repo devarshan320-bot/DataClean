@@ -551,8 +551,9 @@ def run_suggest(csv_path):
     print("\nNo data was modified.")
 
 
-def prepare_suggestion(issue):
+def prepare_suggestion(issue, df):
     from local_ai_interpreter import suggest_operation
+    from suggestion_resolver import resolve_suggestion
     from operations import validate_operation_request
 
     suggestion = suggest_operation(issue)
@@ -560,24 +561,48 @@ def prepare_suggestion(issue):
     if suggestion.get("operation") is None:
         raise ValueError("No safe operation was suggested for this issue.")
 
-    operation = suggestion["operation"]
-    column = suggestion.get("column")
-    parameters = suggestion.get("parameters", {})
+    resolved = resolve_suggestion(suggestion, issue, df)
+    
+    if isinstance(resolved, str):
+        # Legacy format, treat as review required
+        return {
+            "issue": issue,
+            "resolution_type": "REVIEW_REQUIRED",
+            "message": resolved
+        }
 
-    valid, message = validate_operation_request(
-        operation,
-        column,
-        parameters,
-    )
+    resolution_type = resolved.get("resolution_type", "SAFE_FIX")
+    
+    if resolution_type == "REVIEW_REQUIRED":
+        return {
+            "issue": issue,
+            "resolution_type": "REVIEW_REQUIRED",
+            "message": resolved.get("message", "Review required.")
+        }
 
-    if not valid:
-        raise ValueError(f"Invalid AI suggestion: {message}")
+    operation = resolved.get("operation")
+    column = resolved.get("column")
+    parameters = resolved.get("parameters", {})
+
+    if resolution_type not in ["STANDARDIZATION_AVAILABLE"]:
+        valid, message = validate_operation_request(
+            operation,
+            column,
+            parameters,
+        )
+
+        if not valid:
+            raise ValueError(f"Invalid AI suggestion: {message}")
 
     return {
         "issue": issue,
         "operation": operation,
         "column": column,
         "parameters": parameters,
+        "resolution_type": resolution_type,
+        "message": resolved.get("message", ""),
+        "available_targets": resolved.get("available_targets", []),
+        "detected_units": resolved.get("detected_units", []),
     }
 
 
@@ -586,7 +611,7 @@ def preview_suggestion(csv_path, issue):
 
     df = load_csv(csv_path)
 
-    suggestion = prepare_suggestion(issue)
+    suggestion = prepare_suggestion(issue, df)
 
     request = {
         "operation": suggestion["operation"],
@@ -627,7 +652,7 @@ def apply_suggestion(csv_path, issue, output_path):
 
     df = load_csv(csv_path)
 
-    suggestion = prepare_suggestion(issue)
+    suggestion = prepare_suggestion(issue, df)
 
     request = {
         "operation": suggestion["operation"],

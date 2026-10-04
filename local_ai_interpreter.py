@@ -96,4 +96,16 @@ Detected issue:
     if operation is not None and operation not in ALLOWED_OPERATIONS:
         raise ValueError(f"Local AI returned unsupported operation: {operation}")
 
+    if operation == "fill_numeric":
+        if "parameters" not in request or not isinstance(request["parameters"], dict):
+            request["parameters"] = {}
+        if "strategy" not in request["parameters"]:
+            request["parameters"]["strategy"] = "median"
+            
+    if operation == "fill_categorical":
+        if "parameters" not in request or not isinstance(request["parameters"], dict):
+            request["parameters"] = {}
+        if "strategy" not in request["parameters"]:
+            request["parameters"]["strategy"] = "mode"
+
     return request

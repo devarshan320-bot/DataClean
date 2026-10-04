@@ -2,6 +2,8 @@ from cleaner import (
     clean_dataframe,
     remove_units_from_column,
     standardize_text_column,
+    format_date_column,
+    standardize_units_in_column,
 )
 
 from operations import validate_operation_request
@@ -64,6 +66,17 @@ def execute_operation(df, request):
         )
 
         return cleaned, changes
+        
+    if operation == "standardize_units":
+        cleaned = df.copy()
+        
+        changes = standardize_units_in_column(
+            cleaned,
+            column,
+            parameters["target_unit"]
+        )
+        
+        return cleaned, changes
 
     if operation == "standardize_text":
         cleaned = df.copy()
@@ -76,11 +89,36 @@ def execute_operation(df, request):
 
         return cleaned, changes
 
+    if operation == "date_format":
+        cleaned = df.copy()
+
+        changes = format_date_column(
+            cleaned,
+            column,
+            parameters["interpretation"],
+            parameters["format"],
+        )
+
+        return cleaned, changes
+
     if operation == "fill_numeric":
         cleaned, stats = clean_dataframe(
             df,
             False,
             False,
+            parameters["strategy"],
+            None,
+            column,
+        )
+
+        return cleaned, stats["missing_changes"]
+
+    if operation == "fill_categorical":
+        cleaned, stats = clean_dataframe(
+            df,
+            False,
+            False,
+            None,
             parameters["strategy"],
             None,
             column,

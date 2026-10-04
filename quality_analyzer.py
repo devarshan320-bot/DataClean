@@ -74,3 +74,18 @@ def analyze_quality(df):
         )
 
     return issues
+    
+def get_display_issues(issues, df):
+    display_issues = []
+    for issue in issues:
+        if issue.get("type") == "embedded_units" and "column" in issue:
+            col = issue["column"]
+            if any(i.get("type") == "missing_values" and i.get("column") == col for i in issues):
+                from suggestion_resolver import resolve_suggestion
+                res = resolve_suggestion({}, issue, df)
+                if isinstance(res, dict) and "resolved as part of the missing-value issue" in res.get("message", ""):
+                    continue
+                elif isinstance(res, str) and "resolved as part of the missing-value issue" in res:
+                    continue
+        display_issues.append(issue)
+    return display_issues

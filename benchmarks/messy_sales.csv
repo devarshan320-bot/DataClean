@@ -1,0 +1,14 @@
+customer_id,customer_name,email,city,product,quantity,price,order_date,weight,status
+C001,Rahul Kumar,rahul@example.com,Bengaluru,Laptop,2,55000,01-08-2026,2.5 kg,Delivered
+C002, rahul kumar ,rahul2@example.com,bengaluru,Mouse,5,"1,299",2026-08-02,250g,delivered
+C003,PRIYA SHARMA,priya@example.com,Bangalore,Keyboard,"3 units",₹2499,"Aug 03, 2026",0.8kg,DELIVERED
+C004,Arjun Rao,arjun@example.com, Mysuru,Monitor,1,15000,04-08-2026,5 kg,Shipped
+C005,Sneha Patel,sneha@example.com,Mysuru,Headphones,-2,3500,2026-08-05,300 g,shipped
+C006,Kiran Das,kiran@example.com,Bengaluru,Mouse,4,1299,06-08-2026,250g,Delivered
+C006,Kiran Das,kiran@example.com,Bengaluru,Mouse,4,1299,06-08-2026,250g,Delivered
+C007,Meera Nair,meera@example.com,,Laptop,1,75000,2026-08-08,2.7 kg,Delivered
+C008,ROHAN VERMA,rohan@example.com,BENGALURU,Keyboard,,2499,"Aug 09, 2026",0.9 kg,DELIVERED
+C009,Asha Rao,asha@example.com,Bangalore,Monitor,2,"15,000",10-08-2026,5kg,Shipped
+C010, Vijay Kumar ,vijay@example.com,Mysuru,Laptop,1,65000,2026-08-11,2.6 kg,shipped
+C011,Neha Singh,neha@example.com,Bengaluru,Mouse,3,1299,12-08-2026,250 g,Delivered
+C012,Sameer Ali,sameer@example.com,bengaluru,Keyboard,2,2499,"Aug 13, 2026",0.8 kg,delivered

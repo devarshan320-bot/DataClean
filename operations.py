@@ -23,6 +23,7 @@ OPERATIONS = {
     "fill_categorical": {
         "description": "Fill missing values in categorical columns.",
         "requires_column": False,
+        "optional_column": True,
         "parameters": ["strategy"],
         "allowed_values": {
             "strategy": ["mode"],
@@ -33,6 +34,12 @@ OPERATIONS = {
         "description": "Remove embedded units from a specified column.",
         "requires_column": True,
         "parameters": ["unit"],
+        "implemented": True,
+    },
+    "standardize_units": {
+        "description": "Convert units to a target unit.",
+        "requires_column": True,
+        "parameters": ["target_unit"],
         "implemented": True,
     },
     "standardize_text": {
@@ -47,8 +54,8 @@ OPERATIONS = {
     "date_format": {
         "description": "Convert date values to a specified format.",
         "requires_column": True,
-        "parameters": ["format"],
-        "implemented": False,
+        "parameters": ["interpretation", "format"],
+        "implemented": True,
     },
     "currency_format": {
         "description": "Format numeric values as a specified currency.",

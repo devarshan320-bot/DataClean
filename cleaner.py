@@ -88,6 +88,7 @@ def clean_dataframe(
     fill_numeric,
     fill_categorical,
     numeric_column=None,
+    categorical_column=None,
 ):
     cleaned = df.copy()
 
@@ -143,11 +144,30 @@ def clean_dataframe(
 
                 missing_changes.extend(numeric_changes)
         if fill_categorical:
-            cleaned, categorical_changes = fill_categorical_missing(
-                cleaned,
-                fill_categorical,
-            )
-            missing_changes.extend(categorical_changes)
+            if categorical_column is None:
+                cleaned, categorical_changes = fill_categorical_missing(
+                    cleaned,
+                    fill_categorical,
+                )
+                missing_changes.extend(categorical_changes)
+            else:
+                if categorical_column not in cleaned.columns:
+                    raise ValueError(
+                        f"Column '{categorical_column}' was not found in the dataset."
+                    )
+
+                if pd.api.types.is_numeric_dtype(cleaned[categorical_column]):
+                    raise ValueError(f"Column '{categorical_column}' is numeric. Expected categorical.")
+
+                column_df = cleaned[[categorical_column]].copy()
+
+                column_df, categorical_changes = fill_categorical_missing(
+                    column_df,
+                    fill_categorical,
+                )
+
+                cleaned[categorical_column] = column_df[categorical_column]
+                missing_changes.extend(categorical_changes)
 
     if remove_duplicates:
         duplicate_mask = cleaned.duplicated()
@@ -233,6 +253,47 @@ def remove_units_from_column(df, column, unit="kg"):
             )
 
     return changes
+    
+def standardize_units_in_column(df, column, target_unit):
+    from unit_registry import convert_value
+    pattern = re.compile(
+        r"^\s*([-+]?\d+(?:\.\d+)?)\s*([a-zA-Z]+)\s*$",
+        re.IGNORECASE,
+    )
+
+    changes = []
+    df[column] = df[column].astype(object)
+
+    for index, value in df[column].items():
+        if pd.isna(value):
+            continue
+
+        original = str(value).strip()
+        match = pattern.match(original)
+
+        if match:
+            num = float(match.group(1))
+            src_unit = match.group(2)
+            
+            try:
+                converted = convert_value(num, src_unit, target_unit)
+                cleaned = f"{converted} {target_unit}"
+                
+                if original != cleaned:
+                    df.at[index, column] = cleaned
+                    changes.append(
+                        {
+                            "row": index + 2,
+                            "column": column,
+                            "original_value": original,
+                            "cleaned_value": cleaned,
+                            "reason": f"Converted from {src_unit} to {target_unit}",
+                        }
+                    )
+            except ValueError:
+                pass
+
+    return changes
 
 
 def standardize_text_column(df, column, style):
@@ -288,6 +349,54 @@ def standardize_text_column(df, column, style):
                 }
             )
 
+    return changes
+
+
+def format_date_column(df, column, interpretation, target_format):
+    changes = []
+    
+    target_format_map = {
+        "DD-MM-YYYY": "%d-%m-%Y",
+        "MM-DD-YYYY": "%m-%d-%Y",
+        "YYYY-MM-DD": "%Y-%m-%d",
+        "Month DD, YYYY": "%B %d, %Y"
+    }
+    
+    if target_format not in target_format_map:
+        print(f"Error: Unsupported target date format '{target_format}'.")
+        sys.exit(1)
+        
+    strftime_format = target_format_map[target_format]
+    dayfirst = (interpretation == "DD-MM-YYYY")
+    
+    for index, value in df[column].items():
+        if pd.isna(value):
+            continue
+            
+        original = str(value).strip()
+        if not original:
+            continue
+            
+        try:
+            parsed = pd.to_datetime(original, dayfirst=dayfirst, format="mixed")
+        except:
+            parsed = pd.to_datetime(original, dayfirst=dayfirst, errors="coerce")
+            
+        if pd.isna(parsed):
+            continue
+            
+        cleaned = parsed.strftime(strftime_format)
+        
+        if original != cleaned:
+            df.at[index, column] = cleaned
+            changes.append({
+                "row": index + 2,
+                "column": column,
+                "original_value": original,
+                "cleaned_value": cleaned,
+                "reason": f"Converted date to {target_format} using user-selected interpretation"
+            })
+            
     return changes
 
 

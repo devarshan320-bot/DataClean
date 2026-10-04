@@ -163,7 +163,7 @@ def profile_date_issues(df):
 
 def profile_unit_issues(df):
     unit_pattern = re.compile(
-        r"^\s*[-+]?\d+(?:\.\d+)?\s*" r"(kg|kgs|days?|years?)" r"\s*$",
+        r"^\s*[-+]?\d+(?:\.\d+)?\s*([a-zA-Z]+)\s*$",
         re.IGNORECASE,
     )
 
@@ -179,6 +179,18 @@ def profile_unit_issues(df):
                 matches.append(value)
 
         if matches:
+            from unit_registry import normalize_unit
+            # Determine if it's fully consistent
+            if len(matches) == len(values):
+                # All values have units. Let's see if they are the same unit.
+                units_found = set()
+                for m in matches:
+                    u_match = unit_pattern.match(m)
+                    units_found.add(normalize_unit(u_match.group(1)))
+                if len(units_found) == 1:
+                    # All values have the EXACT same unit -> No issue.
+                    continue
+                    
             issues[column] = matches
 
     return issues
