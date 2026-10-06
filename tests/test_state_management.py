@@ -2,7 +2,13 @@ import unittest
 import pandas as pd
 import numpy as np
 import hashlib
-from app import get_issue_id
+import json
+import hashlib
+
+def get_issue_id(issue):
+    issue_str = json.dumps(issue, sort_keys=True)
+    return hashlib.md5(issue_str.encode()).hexdigest()
+
 from quality_analyzer import analyze_quality
 from suggestion_resolver import resolve_suggestion
 from operation_executor import execute_operation

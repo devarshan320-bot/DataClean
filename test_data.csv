@@ -1,0 +1,6 @@
+Name,Age,Revenue,OrderDate,CreatedDate,City
+Alice,25,1000,2023-06-01,2023-05-15,Bangalore
+Bob,17,500,2023-06-15,2023-06-01,Mysore
+Charlie,35,1500,2023-07-01,2023-06-20,Chennai
+Alice,25,1000,2023-06-01,2023-05-15,Bangalore
+David,40,2000,2023-08-01,2023-07-25,Delhi
