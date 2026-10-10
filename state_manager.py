@@ -8,12 +8,21 @@ class HistoryManager:
         self.contracts = []
         
     def apply_contract(self, contract: ReadyContract):
-        # Validate against the current dataframe state before accepting
-        current_cols = list(self.get_current_df().columns)
+        current_df = self.get_current_df()
+
+        # 1. Structural column validation against the current state
+        current_cols = list(current_df.columns)
         errors = validate_contract(contract, current_cols)
         if errors:
             raise ValueError(f"Contract failed semantic validation against current state: {errors}")
         
+        # 2. Dry-run execution on a copy to verify data and type compatibility
+        try:
+            execute_contract(current_df.copy(), contract)
+        except Exception as e:
+            raise ValueError(f"Contract dry-run execution failed against current state: {e}") from e
+
+        # 3. Append to history only after both validation and dry-run succeed
         self.contracts.append(contract)
         
     def undo(self):

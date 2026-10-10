@@ -159,3 +159,68 @@ def test_stale_contract_rejection():
     
     with pytest.raises(ValueError, match="failed semantic validation"):
         hm.apply_contract(c1)
+
+def test_apply_contract_dry_run_type_incompatibility_rejected():
+    df = pd.DataFrame({"Age": [25, 17], "Name": ["Alice", "Bob"]})
+    hm = HistoryManager(df)
+    
+    initial_history_len = len(hm.get_history())
+    initial_df = hm.get_current_df()
+    
+    # "Age" exists (passes structural validation), but is numeric so normalize_text fails during execution
+    bad_contract = ReadyContract.model_validate({
+        "operations": [{"op": "normalize_text", "columns": ["Age"], "style": "lower"}]
+    })
+    
+    with pytest.raises(ValueError, match="dry-run execution failed"):
+        hm.apply_contract(bad_contract)
+        
+    # Rejected contract must not be appended to history
+    assert len(hm.get_history()) == initial_history_len
+    # Current dataframe and original dataframe must remain unchanged
+    pd.testing.assert_frame_equal(hm.get_current_df(), initial_df)
+    pd.testing.assert_frame_equal(hm.original_df, initial_df)
+
+def test_apply_contract_success_and_valid_execution():
+    df = pd.DataFrame({"Age": [25, 17], "Name": ["Alice", "Bob"]})
+    hm = HistoryManager(df)
+    
+    valid_contract = ReadyContract.model_validate({
+        "operations": [{"op": "normalize_text", "columns": ["Name"], "style": "lower"}]
+    })
+    
+    hm.apply_contract(valid_contract)
+    assert len(hm.get_history()) == 1
+    assert hm.get_current_df()["Name"].tolist() == ["alice", "bob"]
+
+def test_apply_contract_dry_run_rejection_preserves_prior_history():
+    df = pd.DataFrame({"Age": [25, 17], "Name": ["Alice", "Bob"]})
+    hm = HistoryManager(df)
+    
+    c1 = ReadyContract.model_validate({
+        "operations": [{"op": "filter", "condition": {"operator": "gte", "column": "Age", "value": 18}}]
+    })
+    hm.apply_contract(c1)
+    
+    assert len(hm.get_history()) == 1
+    df_after_c1 = hm.get_current_df()
+    assert len(df_after_c1) == 1
+    assert df_after_c1["Age"].tolist() == [25]
+    
+    # Attempt applying an incompatible contract on the filtered dataframe
+    bad_contract = ReadyContract.model_validate({
+        "operations": [{"op": "normalize_text", "columns": ["Age"], "style": "upper"}]
+    })
+    
+    with pytest.raises(ValueError, match="dry-run execution failed"):
+        hm.apply_contract(bad_contract)
+        
+    # Existing history and state remain intact
+    assert len(hm.get_history()) == 1
+    pd.testing.assert_frame_equal(hm.get_current_df(), df_after_c1)
+    
+    # Subsequent undo still functions correctly on prior history
+    hm.undo()
+    assert len(hm.get_history()) == 0
+    assert len(hm.get_current_df()) == 2
+
